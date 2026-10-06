@@ -1,0 +1,2240 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shape — juego de posición off the ball</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: dark;
+  --turf:#0d1b12; --turf-2:#183020; --line:#33553d;
+  --flood:#f5f8f3; --dim:#b6c9bb;
+  --kit:#5b9dff; --opp:#ff5c44; --go:#c6ef2f; --warn:#f5bb44;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{background:#0d1b12}
+#bg{position:fixed;inset:0;background:#0d1b12;z-index:-1}
+html,body{margin:0;height:100%;background:var(--turf);color:var(--flood);
+  font-family:Inter,system-ui,-apple-system,sans-serif;overscroll-behavior:none}
+body{display:flex;flex-direction:column;user-select:none}
+
+header{display:flex;align-items:center;gap:14px;padding:9px 14px;border-bottom:1px solid var(--line);
+  flex:0 0 auto;background:var(--turf);color:var(--flood)}
+.mark{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;letter-spacing:.14em;text-transform:uppercase}
+.mark span{color:var(--go)}
+.hgap{flex:1}
+.meta{font-family:'Barlow Condensed',sans-serif;font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.iconbtn{background:none;border:1px solid var(--line);color:var(--dim);border-radius:6px;
+  font-family:'Barlow Condensed',sans-serif;font-size:14px;letter-spacing:.08em;text-transform:uppercase;
+  padding:5px 10px;cursor:pointer}
+
+.sides{display:flex;flex:0 0 auto;padding:0 14px 9px;background:var(--turf)}
+.side{flex:1}
+.side:first-child{margin-right:8px}
+.side .lab{display:flex;justify-content:space-between;font-family:'Barlow Condensed',sans-serif;
+  font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:4px}
+.side .lab b{color:var(--flood);font-weight:600}
+.track{height:5px;background:var(--turf-2);border-radius:3px;overflow:hidden}
+.fill{height:100%;width:0%;background:var(--kit);transition:width .5s ease}
+.side.weak .fill{background:var(--warn)}
+
+#stage{position:relative;flex:1 1 auto;min-height:0;background:#0a1410;overflow:hidden}
+#stage canvas{display:block;width:100%;height:100%}
+#mask{position:absolute;inset:0;display:none;image-rendering:pixelated}
+#labels{position:absolute;inset:0;pointer-events:none;display:none}
+#leaders{position:absolute;inset:0;display:none;pointer-events:none}
+#leaders line{stroke:var(--opp);stroke-width:1.3;opacity:.9}
+#leaders line.kit{stroke:var(--kit)}
+#leaders circle{fill:var(--opp)}
+#leaders circle.kit{fill:var(--kit)}
+
+
+.tag{position:absolute;white-space:nowrap;
+  font-family:'Barlow Condensed',sans-serif;font-size:13.5px;letter-spacing:.04em;text-transform:uppercase;
+  background:rgba(10,20,14,.92);border:1px solid var(--line);border-left:3px solid var(--go);
+  padding:2px 7px;color:var(--flood)}
+.tag.opp{border-left-color:var(--opp)}
+.tag.kit{border-left-color:var(--kit)}
+.veil{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  flex-direction:column;gap:10px;background:rgba(8,16,11,.95);text-align:center;padding:24px}
+.veil.on{display:flex}
+.big{font-family:'Barlow Condensed',sans-serif;font-size:46px;line-height:1;letter-spacing:.04em;text-transform:uppercase}
+.sub{color:var(--dim);font-size:15px;max-width:32ch;line-height:1.5}
+#timer{position:absolute;left:0;top:0;height:3px;width:100%;background:var(--go);display:none}
+
+footer{flex:0 0 auto;border-top:1px solid var(--line);background:var(--turf);color:var(--flood);
+  padding:12px 14px calc(12px + env(safe-area-inset-bottom))}
+.ask{font-family:'Barlow Condensed',sans-serif;font-size:30px;line-height:1;letter-spacing:.06em;
+  text-transform:uppercase;margin:0 0 11px;text-align:center}
+.ask small{display:block;font-family:Inter,sans-serif;font-size:13px;letter-spacing:0;text-transform:none;
+  color:var(--dim);margin-top:5px;font-weight:400}
+.answers{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.ans .arw{display:block;font-size:34px;line-height:1;margin-bottom:2px}
+.ans .cap{display:block}
+.rank{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--line);
+  border-radius:8px;background:var(--turf-2)}
+.row.picked{border-color:var(--flood)}
+.chip{font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;
+  padding:2px 8px;border-radius:4px;flex:0 0 auto;font-weight:600;color:#0d1b12}
+.t3{background:var(--go)} .t2{background:#7cc74e} .t1{background:var(--warn)} .t0{background:var(--opp);color:#fff}
+.row .arw{font-size:21px;flex:0 0 auto;width:22px;text-align:center}
+.row .wy{font-size:13px;color:var(--dim);line-height:1.4}
+.row .wy b{color:var(--flood);font-weight:600}
+.row .you{margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:12px;
+  letter-spacing:.1em;color:var(--dim);flex:0 0 auto}
+.ans{background:var(--turf-2);border:1px solid var(--line);color:var(--flood);border-radius:9px;
+  padding:12px 9px;font-family:'Barlow Condensed',sans-serif;font-size:19px;letter-spacing:.04em;
+  text-transform:uppercase;cursor:pointer;min-height:74px;line-height:1.1;text-align:left}
+.ans .sub{display:block;font-family:Inter,sans-serif;font-size:11.5px;font-weight:400;
+  letter-spacing:0;text-transform:none;color:var(--dim);margin-top:5px;line-height:1.25}
+.ans:disabled{opacity:.4;cursor:default}
+.ans.right{background:var(--go);color:#0d1b12;border-color:var(--go)}
+.ans.right .sub,.ans.wrong .sub{color:inherit;opacity:.75}
+.ans.wrong{background:var(--opp);color:#fff;border-color:var(--opp)}
+.ans.part{background:var(--warn);color:#0d1b12;border-color:var(--warn)}
+.ans.part .sub{color:inherit;opacity:.75}
+.cta{width:100%;background:var(--go);color:#0d1b12;border:0;border-radius:9px;padding:15px;
+  font-family:'Barlow Condensed',sans-serif;font-size:20px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;cursor:pointer}
+.cta.ghost{background:none;color:var(--dim);border:1px solid var(--line);margin-top:6px}
+.hide{display:none!important}
+.note{font-size:13.5px;color:var(--dim);line-height:1.55;margin:10px 0 0}
+.seglab{font-family:'Barlow Condensed',sans-serif;font-size:14px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--dim);margin:0 0 7px}
+.seg{display:flex;gap:6px;margin-bottom:11px}
+.seg button{flex:1;background:var(--turf-2);border:1px solid var(--line);color:var(--dim);border-radius:9px;
+  padding:13px 6px;font-family:'Barlow Condensed',sans-serif;font-size:19px;letter-spacing:.05em;
+  text-transform:uppercase;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--kit);border-color:var(--kit);color:#0a1410;font-weight:600}
+.summary{display:flex;gap:9px;margin:0 0 4px}
+.stat{flex:1;border:1px solid var(--line);border-radius:9px;padding:10px}
+.stat .n{font-family:'Barlow Condensed',sans-serif;font-size:34px;line-height:1}
+.stat .k{font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* A wide-angle look: on a tall, narrow screen the 9 and the far side of the
+   picture simply do not fit, and a rep with the answer cut out of it trains
+   the wrong thing. So a portrait phone is asked to turn sideways. */
+#rotate{display:none;position:fixed;inset:0;z-index:50;background:#0d1b12;
+  color:var(--flood);flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;padding:24px;text-align:center}
+#rotate svg{width:64px;height:64px;animation:tilt 1.8s ease-in-out infinite}
+#rotate b{font-family:'Barlow Condensed',sans-serif;font-size:26px;letter-spacing:.06em;text-transform:uppercase}
+#rotate span{color:var(--dim);font-size:14px;max-width:280px;line-height:1.45}
+@keyframes tilt{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+@media (orientation:portrait) and (max-width:760px){ #rotate{display:flex} }
+#mapwrap{position:absolute;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+  background:rgba(8,16,11,.94);padding:8px}
+#map{height:100%;width:100%;touch-action:manipulation;cursor:crosshair}
+#stage{touch-action:none}
+#map .pitch{fill:#2f7d3b}
+#map .pitch{fill:#2f7d3b} #map .ln{stroke:#dfe8e0;stroke-width:.3;fill:none;opacity:.8}
+#map .cone{stroke:#c6ef2f;stroke-width:.25;stroke-dasharray:1.2 1;opacity:.7}
+#map text{font-family:'Barlow Condensed',sans-serif;fill:#fff}
+#radar{position:absolute;left:8px;bottom:8px;width:31%;max-width:230px;aspect-ratio:112/75;z-index:20;display:none;
+  border-radius:6px;background:rgba(8,16,11,.55);pointer-events:none}
+@media (min-width:900px) and (min-height:501px){
+  body:has(#panelFeedback:not(.hide)){display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,34%);grid-template-rows:auto auto minmax(0,1fr)}
+  body:has(#panelFeedback:not(.hide)) header{grid-column:1 / -1}
+  body:has(#panelFeedback:not(.hide)) .sides{grid-column:1;grid-row:2}
+  body:has(#panelFeedback:not(.hide)) #stage{grid-column:1;grid-row:3}
+  body:has(#panelFeedback:not(.hide)) footer{grid-column:2;grid-row:2 / 4;overflow-y:auto;border-top:0;border-left:1px solid var(--line);padding:12px}
+}
+</style>
+
+<div id="bg"></div>
+<header>
+  <div class="mark">Shape<span>.</span></div>
+  <div class="hgap"></div>
+  <div class="meta" id="hmeta">Rep 0 / 16</div>
+  <button class="iconbtn" id="reset">Reset</button>
+</header>
+
+<div class="sides">
+  <div class="side" id="sideL">
+    <div class="lab"><span>Left wing</span><b id="pctL">—</b></div>
+    <div class="track"><div class="fill" id="fillL"></div></div>
+  </div>
+  <div class="side" id="sideR">
+    <div class="lab"><span>Right wing</span><b id="pctR">—</b></div>
+    <div class="track"><div class="fill" id="fillR"></div></div>
+  </div>
+</div>
+
+<div id="stage">
+  <div id="mapwrap"><svg id="map" preserveAspectRatio="xMidYMid meet"></svg></div>
+  <svg id="radar" viewBox="-56 -37.5 112 75" preserveAspectRatio="xMidYMid meet"></svg>
+  <div id="timer"></div>
+  <canvas id="mask"></canvas>
+  <div id="labels"></div>
+  <svg id="leaders"></svg>
+  <div class="veil on" id="veil">
+    <div class="big" id="veilBig">Ready</div>
+    <div class="sub" id="veilSub">Five lanes. When it freezes: your lane, and your line.</div>
+  </div>
+</div>
+
+<footer>
+  <div id="panelIdle">
+    <p class="seglab">Which wing today</p>
+    <div class="seg" id="seg">
+      <button data-side="L" aria-pressed="false">Left</button>
+      <button data-side="R" aria-pressed="true">Right</button>
+      <button data-side="alt" aria-pressed="false">Both</button>
+    </div>
+    <p class="seglab">Mode</p>
+    <div class="seg" id="modeSeg">
+      <button data-mode="learn" aria-pressed="true">Learn</button>
+      <button data-mode="test" aria-pressed="false">Test</button>
+    </div>
+    <button class="cta" id="start">Start session</button>
+    <p class="note">16 reps, about five minutes. Spanish positional play (<i>juego de posici&oacute;n</i>) cuts the pitch into <b>five lanes</b>: two wide lanes, two inside lanes (<i>pasillos interiores</i>; English coaches call them half-spaces) and the middle. Spread out: no more than two team-mates in a lane and no more than three on a line, so whoever has the ball always has two or three options. A few seconds of play, then it freezes as the last pass is struck: tap where you should be.<br><br><b>We have it</b> &mdash; you are the width (<i>amplitud</i>), level with their last defender: on the touchline when the ball is on your side, pinning their full-back (<i>fijar al lateral</i>); a few metres in when it is central; at the inside edge of your lane when it is far. If your full-back takes your lane on your line, you take the half-space.<br><b>They have it</b> &mdash; you are one of the midfield four (<i>l&iacute;nea de medios</i>): level with your 8s, closing your half-space, sliding with the block (<i>basculaci&oacute;n</i>); jump to their full-back as the ball travels to him (<i>saltar al lateral</i>).<br><b>We just lost it</b> &mdash; press straight away (<i>presi&oacute;n tras p&eacute;rdida</i>): their outlet right by you, you press him; away from you, do not chase the ball: take the man nearest you who could get the next pass &mdash; usually their full-back &mdash; and shut the pass to him.<br><br><b>Learn</b> paints the lanes on the grass and shows everyone on the map when you tap. <b>Test</b> takes all of that away.<br><br><b>Scan:</b> while it plays, tap the left or right half of the screen (on a computer, the &larr; &rarr; keys) to look over that shoulder &mdash; a quick 90&deg; turn of the head and straight back to the ball, about a third of a second, like a pro.</p></p></p>
+  </div>
+
+  <div id="panelAsk" class="hide">
+    <p class="ask" id="askWord">—<small id="askHint"></small></p>
+    <div class="answers" id="answers"></div>
+  </div>
+
+  <div id="panelFeedback" class="hide">
+    <div class="rank" id="rank"></div>
+    <button class="cta ghost" id="replay">Replay the clip and your run</button>
+    <button class="cta" id="next">Next rep</button>
+  </div>
+
+  <div id="panelSummary" class="hide">
+    <div class="summary">
+      <div class="stat"><div class="n" id="sumScore">0%</div><div class="k">Session</div></div>
+      <div class="stat"><div class="n" id="sumFlash">—</div><div class="k">Spot on</div></div>
+      <div class="stat"><div class="n" id="sumGap">—</div><div class="k">Side gap</div></div>
+    </div>
+    <p class="note" id="sumNote"></p>
+    <button class="cta" id="again" style="margin-top:11px">Another session</button>
+    <button class="cta ghost" id="done">Finish</button>
+  </div>
+</footer>
+<div id="rotate" role="alert">
+  <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3"><rect x="20" y="6" width="24" height="52" rx="4"/><circle cx="32" cy="50" r="2" fill="currentColor"/></svg>
+  <b>Turn your phone sideways</b>
+  <span>This drill needs the whole width of the pitch in one look.</span>
+</div>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ---------------- tunables — everything worth changing is here ---------------- */
+const CFG = {
+  cueMs: 800,
+  flashMs: 700,        // a real scan: seven tenths of a second, everyone moving
+  checkMs: 500,        // (unused here)
+  windMs: 800,         // his full-back shapes up and strikes it
+  travelMs: 800,       // the pass rolling to him
+  turnMs:  500,        // then the head comes up to read the picture
+  headDownY: -70,      // eyes on the ball at his feet: where the look starts
+  maskMs: 200,
+  /* metres per second. A quick 12-year-old tops out near 6; jockeying
+     and shuffling are far slower, and that difference is the read. */
+  /* metres per second for a 12-year-old IN A GAME, not on a stopwatch. They
+     rarely reach top speed over these distances, and defenders move a lot
+     slower than people remember. */
+  mps: { sprint:4.6, press:3.4, jockey:1.9, shuffle:1.1 },
+  answerMs: 7000,
+  repsPerSession: 16,
+  eyeHeight: 1.55,
+  wingX: 28,                        // where he is standing, off the touchline
+  ballAt: [-11.5, 16.5],            // roughly where the pass will come from
+  hFov: 100,                        // HORIZONTAL degrees: a winger's picture, both lines and the ball
+  vFovMax: 76,
+  look: { ox: -21.03, oz: -15.28 },  // across the pitch toward goal, from his half-space
+  colors: { own: 0x5b9dff, opp: 0xff5c44, skin: 0xe8c9a0, ownGK: 0xf5d42a, oppGK: 0x9b5de5 }
+};
+
+/* ---------------- storage ---------------- */
+const KEY = 'shape:v1';
+let stats = { L:{pts:0,max:0}, R:{pts:0,max:0}, side:'R' };
+async function loadStats(){
+  try{
+    if (window.storage){ const r = await window.storage.get(KEY); if (r && r.value) stats = JSON.parse(r.value); }
+    else if (window.localStorage){ const raw = localStorage.getItem(KEY); if (raw) stats = JSON.parse(raw); }
+  }catch(e){}
+  if (!stats.side) stats.side = 'R';
+  paintSides(); paintSeg();
+}
+async function saveStats(){
+  try{ const s = JSON.stringify(stats);
+    if (window.storage) await window.storage.set(KEY, s);
+    else if (window.localStorage) localStorage.setItem(KEY, s);
+  }catch(e){}
+}
+
+/* ---------------- scene ---------------- */
+const pick = a => a[Math.floor(Math.random()*a.length)];
+
+/* Each rep is built backwards from an intended answer, so the picture is
+   unambiguous. A session deals three of each, shuffled — he cannot lean on
+   one option being rare. */
+/* One cue decides each rep. Everything else in the picture is noise he has
+   to see past. */
+/* Three things a winger can actually see, each a different object on the
+   pitch, and exactly one of them is "on" in any given rep:
+
+     their full-back has tucked inside   -> the touchline is yours, hold width
+     their line is high                  -> grass behind them, go
+     the gap between their lines is open -> underlap into the half-space
+     none of the above                   -> nothing is on, come and get it
+
+   Whether the man on the ball is under pressure is deliberately NOT a cue. It
+   is a ball-carrier's problem; it does not change where a winger should be. */
+/* ONE question: which space has nobody standing in it?
+
+   Three zones ahead of him. Each has a defender in it EXCEPT one \u2014 and that
+   one is the answer. If all three are occupied, nothing is on and he comes
+   back to the ball. No magnitudes to judge, no distances to estimate: a body
+   is either there or it is not. */
+/* ===================== SHAPE: WHERE SHOULD YOU BE? =====================
+   Juego de posición (Spanish positional play) for a winger off the ball.
+
+   The pitch is cut into five vertical lanes (carriles): two wide lanes, two
+   inside lanes (pasillos interiores, the half-spaces) and the middle. At most two
+   per lane and three per line (Perarnau). With the ball, a 4-3-3 fills the front line across all five: two wingers
+   wide, the two 8s in the half-spaces, the 9 in the middle. Without it, the team
+   defends as a 4-1-4-1: the wingers join the 8s in a midfield line of four.
+
+   His jobs, and the reference he uses for each (never metres):
+     WE HAVE IT                                   reference
+       amplitud + fijar (ball on his side)        touchline, level with their last defender
+       amplitud (ball in the middle)              wide lane, level with their last defender
+       amplitud, connected (ball far side)        inside edge of his lane: still wider than his 8
+       one per lane (full-back overlaps)          the half-space, between their full-back and centre-back
+     THEY HAVE IT
+       salto (their full-back gets it)            goal-side and inside their full-back
+       línea de cuatro (ball in the middle)       our midfield line, same gap to his 8 as the 8s keep
+       basculación (ball far side)                our midfield line, slid into his half-space
+     WE JUST LOST IT (the first seconds)
+       presión tras pérdida, near him             press their receiver, goal-side and inside
+       presión tras pérdida, far from him         narrow and high, level with the ball: no way out inside
+
+   Right-wing coordinates: x across (his touchline at x = +34), z along the pitch
+   (we attack toward z = -52.5). Mirrored for the left wing.                          */
+const BAG_COUNT = { attNear: 2, attMid: 2, attFar: 2, attSwap: 2, defNear: 2, defMid: 2, defFar: 2, turnPress: 1, turnCover: 1 };
+const HIT = 5, NEAR = 10, OFF_TOL = 0.5;            // offside tolerance: level is onside
+const LANE_X = [-20.16, -9.16, 9.16, 20.16];          // the lanes follow the boxes: the 18-yard box and the 6-yard box edges
+const rand = (a,b) => a + Math.random()*(b-a);
+const pickOne = a => a[Math.floor(Math.random()*a.length)];
+const d2 = (a, b) => Math.hypot(a[0]-b[0], a[1]-b[1]);
+function shuffleS(a){ for (let i = a.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function newBag(){
+  let out = [];
+  for (const k in BAG_COUNT) for (let i = 0; i < BAG_COUNT[k]; i++) out.push(k);
+  out = shuffleS(out).slice(0, CFG.repsPerSession);
+  for (let i = 1; i < out.length; i++) if (out[i] === out[i-1]){ const j = (i + 2) % out.length; [out[i], out[j]] = [out[j], out[i]]; }
+  return out;
+}
+const zoneOf = bx => bx > 13 ? 'near' : bx < -13 ? 'far' : 'mid';
+const pitch = p => [clamp(p[0], -33, 33), clamp(p[1], -51.5, 51.5)];
+/* which lane a point is in, counted from HIS touchline: 0 his wide lane ... 4 the far wide lane */
+function laneOf(x){ return x > 20.16 ? 0 : x > 9.16 ? 1 : x > -9.16 ? 2 : x > -20.16 ? 3 : 4; }
+const LANE_NAME = ['your wide lane', 'your half-space', 'the middle', 'the far half-space', 'the far wide lane'];
+
+/* ---------- the shapes ----------
+   Fx: where the ball is across the pitch; D: how deep the play is (z).
+   With the ball we hold the lanes (positional: the ball moves, the lanes stay),
+   so we shift only a little. Their block slides a lot. Without the ball we slide
+   as a block (basculación); they spread out to attack.                           */
+function attShape(Fx, D, jit, opt){
+  const ov = (opt && opt.ov) || 0;            // 1: the full-back has gone; 2: and the 8 has covered behind him
+  const sx = clamp(0.15*Fx, -5, 5), L = clamp(D - 14, -40, -8);
+  const o = {
+    LCB: [-10 + sx, D + 18], RCB: [10 + sx, D + 18], LB: [-22 + sx, D + 9],
+    RB: ov ? [31, L + 7] : [22 + sx, D + 9],
+    S6: [sx, D + 6], L8: [-13 + sx, D - 4], R8: ov >= 2 ? [24 + sx, D + 4] : [14 + sx, D - 4],     // when the full-back goes, the 8 covers the wide lane behind him
+    N9: [0.5*sx, L + 1], LW: [-winAtt(-Fx), L + 0.5], OGK: [0.1*Fx, clamp(D + 33, 28, 50.5)]
+  };
+  const so = clamp(0.45*Fx, -12, 12), sm = clamp(0.5*Fx, -13, 13), sf = clamp(0.35*Fx, -9, 9);
+  const t = {
+    TB1: [-15 + so, L], TB2: [-5 + so, L], TB3: [5 + so, L], TB4: [15 + so, L],
+    TM1: [-18 + sm, L + 10], TM2: [-6 + sm, L + 10], TM3: [6 + sm, L + 10], TM4: [18 + sm, L + 10],
+    TF1: [-6 + sf, L + 22], TF2: [6 + sf, L + 22], TGK: [0.1*Fx, -51]
+  };
+  const sh = jitter({ phase: 'att', own: o, opp: t, D, ov: !!ov }, jit);
+  /* with the ball every man keeps to his own lane (two per lane: full-back and winger wide,
+     centre-back and 8 in the inside lane, 6 and 9 in the middle), whatever the shift */
+  const LANE_OF = { LB: -2, LW: -2, LCB: -1, L8: -1, S6: 0, N9: 0, R8: ov >= 2 ? 2 : 1, RCB: 1, RB: 2 };
+  for (const id in LANE_OF){ const p = sh.own[id], l = LANE_OF[id];
+    const lo = l === 2 ? 21.7 : l === 1 ? 10.7 : l === 0 ? -7.6 : l === -1 ? -18.7 : -32.5;
+    const hi = l === 2 ? 32.5 : l === 1 ? 18.7 : l === 0 ? 7.6 : l === -1 ? -10.7 : -21.7;
+    p[0] = clamp(p[0], lo, hi); }
+  return sh;
+}
+/* his width with the ball: on the touchline / a few metres in / the inside edge of his lane */
+function winAtt(bx){ const z = zoneOf(bx); return z === 'near' ? 32 : z === 'mid' ? 29 : 22; }
+function defShape(Fx, D, jit){
+  const sx = clamp(0.45*Fx, -12, 12), B = clamp(D + 15, 8, 44), M = B - 11;
+  const o = {
+    LB: [-20 + sx, B], LCB: [-7 + sx, B], RCB: [7 + sx, B], RB: [20 + sx, B],
+    S6: [sx, M + 5], L8: [-7.5 + sx, M], R8: [7.5 + sx, M], LW: [-22 + sx, M],
+    N9: [0.3*Fx, M - 12], OGK: [0.1*Fx, 50.5]
+  };
+  const t = {
+    TB2: [-9 + 0.3*Fx, D - 14], TB3: [9 + 0.3*Fx, D - 14], TB1: [-27 + 0.2*Fx, D - 4], TB4: [27 + 0.2*Fx, D - 4],
+    TM2: [-6 + 0.35*Fx, D - 6], TM3: [6 + 0.35*Fx, D - 6], TM1: [-20 + 0.4*Fx, D + 6], TM4: [20 + 0.4*Fx, D + 6],
+    TF1: [-6 + 0.3*Fx, D + 12], TF2: [6 + 0.3*Fx, D + 12], TGK: [0.1*Fx, clamp(D - 34, -51, -30)]
+  };
+  const sh = jitter({ phase: 'def', own: o, opp: t, D, M }, jit);
+  sh.rw = pitch([Math.min(22 + sx, 29), M + (jit.RW ? jit.RW[1]*0.3 : 0)]);     // his slot in the line of four
+  return sh;
+}
+function jitter(sh, jit){
+  for (const side of ['own', 'opp']) for (const k in sh[side]){
+    const j = jit[k] || [0, 0];
+    sh[side][k] = pitch([sh[side][k][0] + j[0], sh[side][k][1] + j[1]]);
+  }
+  return sh;
+}
+const lastLine = sh => Math.min(sh.opp.TB1[1], sh.opp.TB2[1], sh.opp.TB3[1], sh.opp.TB4[1]);   // their deepest defender
+const midLine = sh => (sh.own.L8[1] + sh.own.R8[1] + sh.own.LW[1]) / 3;
+
+/* where he should be, and the reference that tells him */
+function idealFor(kind, sh, extra){
+  if (kind.startsWith('att')){
+    const z = lastLine(sh), x = kind === 'attSwap' ? 14 : kind === 'attNear' ? 32 : kind === 'attMid' ? 29 : 22;
+    return { at: pitch([x, z + 0.5]), ref: { type: 'line', z, label: 'their last defender', team: 'opp' } };
+  }
+  if (kind === 'defNear'){
+    const fb = sh.opp.TB4;
+    return { at: pitch([fb[0] - 3, fb[1] + 3]), ref: { type: 'man', id: 'TB4', label: 'their full-back', how: 'goal-side and inside' } };
+  }
+  if (kind === 'defMid' || kind === 'defFar') return { at: sh.rw.slice(), ref: { type: 'line', z: midLine(sh), label: 'our midfield line', team: 'own' } };
+  const r = extra.recv;
+  if (kind === 'turnPress') return { at: pitch([r[0] - 2.5, r[1] + 2.5]), ref: { type: 'man', id: extra.role, label: 'their receiver', how: 'on his inside shoulder, shutting the pass forward and inside' } };
+  return { at: pitch([13, r[1] + 3]), ref: { type: 'line', z: r[1], label: 'the ball', text: 'level with the ball', team: 'ball' } };   // turnCover
+}
+/* the start of the clip: where he stood for the picture as it was */
+function startKind(e){
+  const z = zoneOf(e.Fx);
+  if (e.phase === 'att') return 'att' + z[0].toUpperCase() + z.slice(1);
+  return z === 'near' ? 'defMid' : 'def' + z[0].toUpperCase() + z.slice(1);
+}
+
+const PRINCIPLE = {
+  attNear: { es: 'Amplitud y profundidad &middot; fijar al lateral', title: 'Width and depth: pin their full-back',
+    why: 'We have it on your side. Stay on the touchline, level with their last defender. Your width keeps their full-back out with you &mdash; that opens the half-space inside him for your 8 &mdash; and level with their line you are onside to go in behind the moment he steps out.' },
+  attMid: { es: 'Amplitud', title: 'You are the width',
+    why: 'We have it in the middle. Stay in your wide lane, a few metres in from the line, level with their last defender. If you drift inside, two of us share a lane and their back line gets narrow and comfortable.' },
+  attFar: { es: 'Abierto, pero cerca del juego', title: 'Wide, but close to the play',
+    why: 'We have it on the far side. Come in to the inside edge of your lane &mdash; still wider than your 8, still level with their last defender. The pros stay right on the touchline so that after the switch (cambio de orientaci&oacute;n) they are alone one-on-one with the full-back; you come in until the switch is a pass your team can really play. If it gets crossed from the far side, attack the back post.' },
+  attSwap: { es: '', title: 'Two in your lane already',
+    why: 'Your full-back has overlapped up your lane and your 8 has dropped into it behind him to cover. That is two in your lane &mdash; the most. A third would break the spacing, so you go inside: the half-space, between their full-back and centre-back, level with their last defender. Now their full-back has two of you to deal with.' },
+  defNear: { es: 'Saltar al lateral', title: 'Jump to their full-back',
+    why: 'Their full-back gets it on your side. Jump as the ball is travelling to him, not after he has it, and come on a curve from the inside out, ending goal-side and inside him: your run shuts the pass inside, so he can only go down the line or back.' },
+  defMid: { es: 'L&iacute;nea de medios', title: 'One of the midfield four',
+    why: 'They have it in the middle. You are one of the four in our midfield line: level with your 8s, the same gap to your 8 as the 8s keep to each other. First job: close your half-space so nothing is played through it. Second: be ready to jump if it goes out to their full-back.' },
+  defFar: { es: 'Basculaci&oacute;n', title: 'Slide with the block',
+    why: 'They have it on the far side. The whole block slides toward the ball and you slide with it, into your half-space, level with the midfield line, so there is no gap to play through. If they switch it, you have time to get back out.' },
+  turnPress: { es: 'Presi&oacute;n tras p&eacute;rdida', title: 'Press, straight away',
+    why: 'We just lost it, and their outlet is right by you. Do not run back &mdash; press straight away, before they can settle. Come at him from the angle that shuts his pass forward and inside, so he is pinned against the touchline (general coaching).' },
+  turnCover: { es: 'Presi&oacute;n tras p&eacute;rdida', title: 'Shut the next pass, near you',
+    why: 'We just lost it, away from you. The players nearest the ball press it; the ones further away mark the nearest man who could get the next pass, or cover the passing lines (Coaches&rsquo; Voice). So you do not chase the ball across the pitch: take the man of theirs nearest you who could receive next &mdash; usually their full-back &mdash; and get on the line from the ball to him, a couple of metres off him, so that pass is shut. Only if the press is beaten does the team drop into the block (repliegue).' }
+};
+
+/* ---------- a clip: a chain of passes ---------- */
+const ROLES = {
+  att: ['LCB', 'RCB', 'LB', 'RB', 'S6', 'L8', 'R8', 'N9', 'LW'],
+  def: ['TB1', 'TB2', 'TB3', 'TB4', 'TM1', 'TM2', 'TM3', 'TM4', 'TF1', 'TF2']
+};
+const FINAL = {
+  attNear: ['R8', 'RB'], attMid: ['S6', 'N9', 'LCB', 'RCB'], attFar: ['L8', 'LB', 'LW'], attSwap: ['R8', 'S6', 'N9'],
+  defNear: ['TB4'], defMid: ['TB2', 'TB3', 'TM2', 'TM3'], defFar: ['TB1', 'TM1']
+};
+const SHAPE = { att: attShape, def: defShape };
+/* the receiver's spot: his slot in the shape the ball takes him to (solved, since the shape follows the ball) */
+function receiverSpot(phase, role, D, jit, opt){
+  let Fx = 0;
+  for (let i = 0; i < 10; i++){ const sh = SHAPE[phase](Fx, D, jit, opt); Fx = (phase === 'att' ? sh.own : sh.opp)[role][0]; }
+  const sh = SHAPE[phase](Fx, D, jit, opt);
+  return { Fx, sh, at: (phase === 'att' ? sh.own : sh.opp)[role] };
+}
+function segD(q, a, b){
+  const dx = b[0]-a[0], dz = b[1]-a[1], L2 = dx*dx + dz*dz || 1;
+  const t = clamp(((q[0]-a[0])*dx + (q[1]-a[1])*dz)/L2, 0, 1);
+  return { d: Math.hypot(a[0] + dx*t - q[0], a[1] + dz*t - q[1]), t };
+}
+/* a pass nobody is standing in: every opponent at least 2.5 m off the line */
+function laneClear(from, to, them){
+  for (const k in them){ const r = segD(them[k], from, to); if (r.t > 0.08 && r.t < 0.92 && r.d < 2.5) return false; }
+  return true;
+}
+const PASS_MIN = 10, PASS_MAX = 30;
+function pickW(a){ let t = 0; a.forEach(o => t += o.w); let r = Math.random()*t; for (const o of a){ r -= o.w; if (r <= 0) return o; } return a[a.length-1]; }
+/* n passes from a holder; the last one to one of `finals` (anyone, if not given).
+   `opt` (the full-back's overlap) shapes every picture after the first pass.     */
+function chain(phase, D, holder, n, finals, jit, opt){
+  const out = [];
+  let h = receiverSpot(phase, holder, D, jit, null), role = holder, prevRole = null;
+  out.push({ phase, role, team: phase === 'att' ? 'own' : 'opp', at: h.at, Fx: h.Fx, D, sh: h.sh });
+  for (let i = 1; i <= n; i++){
+    const Dn = D + (phase === 'att' ? rand(-3, 1.5) : rand(-1.5, 3));
+    const opts = [];
+    ROLES[phase].forEach(r => {
+      if (r === role || r === prevRole) return;                   // no straight back to the man who gave it
+      if (i === n && finals && !finals.includes(r)) return;
+      const c = receiverSpot(phase, r, Dn, jit, typeof opt === 'function' ? opt(i) : opt), L = d2(h.at, c.at);
+      if (L < PASS_MIN || L > PASS_MAX) return;
+      if (!laneClear(h.at, c.at, phase === 'att' ? h.sh.opp : h.sh.own)) return;
+      const fwd = (phase === 'att' ? h.at[1] - c.at[1] : c.at[1] - h.at[1]);
+      opts.push({ r, c, L, w: fwd > 4 ? 2.5 : fwd > -4 ? 1.5 : 0.7 });  // mostly forward or across, sometimes back
+    });
+    if (!opts.length) return null;
+    const o = pickW(opts);
+    out.push({ phase, role: o.r, team: phase === 'att' ? 'own' : 'opp', at: o.c.at, Fx: o.c.Fx, D: Dn, sh: o.c.sh, len: o.L });
+    prevRole = role; h = o.c; role = o.r; D = Dn;
+  }
+  return out;
+}
+function candidate(side, key){
+  const jit = { RW: [0, rand(-1.5, 1.5)] };
+  ROLES.att.concat(ROLES.def).forEach(k => jit[k] = [rand(-1.5, 1.5), rand(-1.5, 1.5)]);
+  const turn = key === 'turnover';
+  let solved, kind = key, extra = {};
+  if (!turn){
+    const phase = key.slice(0, 3);
+    const D = phase === 'att' ? rand(-8, 8) : rand(-16, 4);
+    const holders = phase === 'att' ? ['LCB', 'RCB', 'LB', 'RB', 'S6', 'L8', 'R8'] : ['TB1', 'TB2', 'TB3', 'TB4', 'TM2', 'TM3'];
+    solved = chain(phase, D, pickOne(holders), 3, FINAL[key], jit, key === 'attSwap' ? (i => ({ ov: i >= 2 ? 2 : 1 })) : null);
+    if (!solved) return null;
+  } else {
+    /* we have it, one pass goes in, the next is cut out; they play one pass. Freeze. */
+    const D = rand(-10, 6);
+    const ours = chain('att', D, pickOne(['LCB', 'RCB', 'S6', 'LB', 'RB']), 1, null, jit, null);
+    if (!ours) return null;
+    const h = ours[1], sh = h.sh;
+    /* the pass he meant: to a team-mate 12-26 m away; their nearest man steps into it */
+    const meant = ROLES.att.filter(r => r !== h.role && r !== ours[0].role).map(r => ({ r, at: sh.own[r] }))
+                    .filter(o => { const L = d2(h.at, o.at); return L > 12 && L < 26; });
+    let best = null;
+    meant.forEach(o => ['TM1', 'TM2', 'TM3', 'TM4', 'TF1', 'TF2', 'TB1', 'TB2', 'TB3', 'TB4'].forEach(k => {
+      const m = sh.opp[k], q = segD(m, h.at, o.at);
+      if (q.t < 0.35 || q.t > 0.8 || q.d > 4.5) return;
+      if (!best || q.d < best.q.d) best = { k, q, o };
+    }));
+    if (!best) return null;
+    const I = [h.at[0] + (best.o.at[0]-h.at[0])*best.q.t, h.at[1] + (best.o.at[1]-h.at[1])*best.q.t];
+    const cutSh = defShape(I[0], I[1] + 6, jit); cutSh.opp[best.k] = I.slice();
+    const cut = { phase: 'def', role: best.k, team: 'opp', at: I, Fx: I[0], D: I[1] + 6, sh: cutSh, intercept: true, meant: best.o.r, attSh: sh };
+    /* their first pass out of the press: 10-26 m */
+    const opts = [];
+    ROLES.def.forEach(r => {
+      if (r === best.k) return;
+      const c = receiverSpot('def', r, I[1] + 6 + rand(-1, 2), jit), L = d2(I, c.at);
+      if (L < 10 || L > 26) return;
+      if (c.at[1] > I[1] + 6) return;                 // a ball forward past our press is the press beaten: not this rep
+      if (!laneClear(I, c.at, sh.own)) return;
+      opts.push({ r, c, L, w: 1 });
+    });
+    if (!opts.length) return null;
+    const o = pickW(opts);
+    solved = [ours[0], ours[1], cut, { phase: 'def', role: o.r, team: 'opp', at: o.c.at, Fx: o.c.Fx, D: o.c.sh.D, sh: o.c.sh, len: o.L }];
+    extra = { recv: o.c.at, role: o.r, cutAt: I };
+  }
+  /* timing: a touch or two, then the pass at a real pace */
+  let t = rand(500, 800);
+  const ev = [Object.assign({ t: 0 }, solved[0])];
+  for (let i = 1; i < solved.length; i++){
+    const e = solved[i], from = solved[i-1].at, L = d2(from, e.at);
+    const vp = rand(13, 16), ts = t, ta = ts + L/vp*1000, touch = e.intercept ? rand(600, 850) : rand(700, 1000);
+    ev.push(Object.assign({ ts, ta, len: L, vp, touch }, e));
+    t = ta + touch;
+  }
+  const last = ev[ev.length - 1], tFreeze = last.ts + 150;
+  const st0 = idealFor(startKind(ev[0]), ev[0].sh, {}).at, st = [Math.min(st0[0], 31.5), st0[1]];
+  if (turn) kind = 'turnCover';                   // settled once we know who is pressing (sceneOK)
+  const I = idealFor(kind, last.sh, extra);
+  return { side, key, kind, turn, ev, tFreeze, ideal: I.at, ref: I.ref, start: st, jit, extra,
+           wingX: st[0], zBase: st[1], recv: [0, 0], passerAt: [0, 0], intended: kind };
+}
+
+/* ---------- everyone's track: a short simulation, shape to shape ----------
+   Each player heads for his slot in the shape the latest pass is taking the play
+   into, from a quarter of a second after it is struck, at a pace that gets him
+   there as it arrives (never faster than a sprint). The receiver meets the ball.
+   When we lose it, our two nearest press the ball and the rest hold (presión
+   tras pérdida); they break out into their shape.                                 */
+const VMAX = 7.0, VRECV = 7.6, ACC = 5.0, DT = 50;
+const posIn = (sh, id) => sh.own[id] || sh.opp[id];
+function retime(s){
+  let t = s.ev[1].ts;
+  for (let i = 1; i < s.ev.length; i++){ const e = s.ev[i]; e.len = d2(s.ev[i-1].at, e.at); e.ts = t; e.ta = t + e.len/e.vp*1000; t = e.ta + e.touch; }
+  s.tFreeze = s.ev[s.ev.length-1].ts + 150;
+}
+/* the ball goes where the receiver actually gets to: a few runs of the simulation settle it */
+function tracks(s){
+  let T = null;
+  const longEnd = () => s.ev[s.ev.length-1].ta + 600;             // until the last ball has been taken
+  for (let it = 0; it < 8; it++){
+    s._tEnd = longEnd(); T = simulate(s); s._tEnd = undefined;
+    if (T.miss < 0.15) break;
+    for (let i = 1; i < s.ev.length; i++){ const p = T.at[i]; if (p){ const u = uOf(s.ev, i); s.ev[i].at = [p[0] + FOOT*u[0], p[1] + FOOT*u[1]]; } }
+    retime(s);
+  }
+  for (let i = 1; i < s.ev.length; i++) s.ev[i].from = T.from[i] || s.ev[i-1].at;
+  s._tEnd = longEnd(); const L = simulate(s); s._tEnd = undefined;   // every receiver, the last one too, meets his ball
+  const F = simulate(s);                    // the tracks for the passes exactly as they are played, up to the freeze
+  F.miss = L.miss;
+  return F;
+}
+/* The ball stops in front of the man who takes it, on the line of his next pass
+   (or, for the last man, toward where it came from): he gets there while it travels. */
+const FOOT = 0.6;
+function unit(a, b){ const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [dx/l, dz/l]; }
+function uOf(ev, i){
+  if (i === 0) return unit(ev[0].at, ev[1].at);
+  if (ev[i+1]) return unit(ev[i].at, ev[i+1].at);
+  return unit(ev[i].at, ev[i].from || ev[i-1].at);
+}
+function simulate(s){
+  const ev = s.ev, ids = Object.keys(ev[0].sh.own).concat(Object.keys(ev[0].sh.opp));
+  const P = {}, V = {}, tr = {};
+  ids.forEach(id => { P[id] = posIn(ev[0].sh, id).slice(); V[id] = 0; tr[id] = [[0, P[id][0], P[id][1]]]; });
+  const ball = [[0, ev[0].at[0], ev[0].at[1]]];
+  const tEnd = s._tEnd || s.tFreeze + 100;
+  const ci = ev.findIndex(e => e.intercept);
+  const u0 = uOf(ev, 0);
+  let pressers = null, miss = 0, bp = [ev[0].at[0] + FOOT*u0[0], ev[0].at[1] + FOOT*u0[1]];
+  const atRecv = [], from = [];
+  for (let t = DT; t <= tEnd + 1e-6; t += DT){
+    /* the latest pass struck, and who has it */
+    let i = 0; while (i + 1 < ev.length && ev[i+1].ts <= t) i++;
+    const inFlight = i > 0 && t < ev[i].ta;
+    const holder = inFlight ? null : ev[i].role;
+    const lost = ci > 0 && t >= ev[ci].ta + 150;
+    if (lost && !pressers){
+      const I = ev[ci].at;
+      pressers = Object.keys(ev[0].sh.own).filter(id => id !== 'OGK').sort((a, b) => d2(P[a], I) - d2(P[b], I)).slice(0, 2);
+    }
+    ids.forEach(id => {
+      let tgt = null, dl = 0, vmax = VMAX;
+      const own = !!ev[0].sh.own[id];
+      /* who passed it last: a short follow-through along the line */
+      let k0 = -1; for (let k = 1; k < ev.length; k++) if (ev[k-1].role === id && t >= ev[k].ts && t < ev[k].ts + 300) k0 = k;
+      if (id === holder){
+        /* on the ball: still, behind it; a step into it as he strikes */
+        const nx = ev[i+1];
+        if (nx && t >= nx.ts - 300){ const u = uOf(ev, i), b0 = i === 0 ? bp : ev[i].at; tgt = [b0[0] - 0.15*u[0], b0[1] - 0.15*u[1]]; dl = nx.ts; }
+        else tgt = P[id];
+      }
+      else if (k0 > 0 && !(lost && own)){ const u = uOf(ev, k0 - 1), b0 = ev[k0].from || ev[k0-1].at; tgt = [b0[0] + 0.3*u[0], b0[1] + 0.3*u[1]]; dl = ev[k0].ts + 300; }
+      else if (lost && own){
+        if (pressers.includes(id)){ tgt = [bp[0], bp[1] + 1.5]; dl = t; }                       // straight at the ball
+        else { const a = ev[ci].attSh.own[id]; tgt = [a[0], a[1] + 2]; dl = ev[ci].ta + 1500; } // hold, a step back
+      }
+      else {
+        /* which shape is he reacting to? */
+        let j = 0; for (let k = 1; k < ev.length; k++) if (ev[k].ts + 250 <= t || (ev[k].role === id && ev[k].ts + 120 <= t)) j = k;
+        const e = ev[j];
+        if (j > 0 && e.role === id){ const u = uOf(ev, j); tgt = [e.at[0] - FOOT*u[0], e.at[1] - FOOT*u[1]]; dl = Math.max(e.ta, t); vmax = VRECV;
+          const f = e.from || ev[j-1].at, ax = tgt[0] - P[id][0], az = tgt[1] - P[id][1];
+          if (ax*(P[id][0] - f[0]) + az*(P[id][1] - f[1]) > 0) vmax = 2.2; }        // away from the passer: a jog
+        else if (own && ci > 0 && e.phase === 'def'){ tgt = ev[ci].attSh.own[id]; dl = 0; }
+        else { tgt = posIn(e.sh, id) || P[id]; dl = j > 0 ? e.ta + (e.intercept ? 1200 : 400) : 0; }
+      }
+      const dx = tgt[0] - P[id][0], dz = tgt[1] - P[id][1], dist = Math.hypot(dx, dz);
+      let want = dist < 0.15 ? 0 : dist / Math.max(0.35, (dl - t)/1000 + DT/1000);
+      want = Math.min(want, vmax);
+      let v = Math.min(want, V[id] + ACC*DT/1000);
+      if (want < V[id]) v = Math.max(want, V[id] - 2*ACC*DT/1000);
+      const step = Math.min(dist, v*DT/1000);
+      if (dist > 1e-6){ P[id][0] += dx/dist*step; P[id][1] += dz/dist*step; }
+      V[id] = step/(DT/1000);
+    });
+    /* the ball: in the air between feet, otherwise at the holder's feet */
+    if (inFlight){ const e = ev[i], f = (t - e.ts)/(e.ta - e.ts);
+      if (!from[i]) from[i] = bp.slice();                       // struck from where it sat, in front of his foot
+      const a = from[i]; bp = [a[0] + (e.at[0]-a[0])*f, a[1] + (e.at[1]-a[1])*f]; }
+    else { const h = P[ev[i].role];
+      if (i > 0){ bp = ev[i].at.slice();                     // it stops where it was played to: in front of him
+        if (!atRecv[i]){ const u = uOf(ev, i), want = [ev[i].at[0] - FOOT*u[0], ev[i].at[1] - FOOT*u[1]];
+          atRecv[i] = h.slice(); miss = Math.max(miss, d2(h, want)); } } }
+    ball.push([t, bp[0], bp[1]]);
+    if (t % 100 === 0 || t >= tEnd) ids.forEach(id => tr[id].push([t, P[id][0], P[id][1]]));
+  }
+  return { tr, ball, miss, at: atRecv, pressers, from };
+}
+function trackAt(k, T){
+  if (!k || !k.length) return { p: [0, 0], dist: 0, v: [0, 0] };
+  let dist = 0;
+  if (T <= k[0][0]) return { p: [k[0][1], k[0][2]], dist: 0, v: [0, 0] };
+  for (let i = 1; i < k.length; i++){
+    const a = k[i-1], b = k[i], seg = Math.hypot(b[1]-a[1], b[2]-a[2]), dt = Math.max(1, b[0]-a[0]);
+    if (T <= b[0]){ const f = (T - a[0])/dt;
+      return { p: [a[1] + (b[1]-a[1])*f, a[2] + (b[2]-a[2])*f], dist: dist + seg*f, v: [(b[1]-a[1])/dt*1000, (b[2]-a[2])/dt*1000] }; }
+    dist += seg;
+  }
+  const l = k[k.length-1]; return { p: [l[1], l[2]], dist, v: [0, 0] };
+}
+/* The man on the ball shows where it is going: from the moment he has it (after a
+   quarter-second turn from facing the ball coming in), his body points exactly
+   along the line of the pass he is about to play, and stays on it as he strikes it.
+   Returns { a: his facing (right-wing coords), ts: when he strikes it } or null.     */
+const wrapA = a => { while (a > Math.PI) a -= 2*Math.PI; while (a < -Math.PI) a += 2*Math.PI; return a; };
+const lerpA = (a, b, k) => a + wrapA(b - a)*k;
+const easeQ = q => { q = Math.min(1, Math.max(0, q)); return q < 0.5 ? 2*q*q : 1 - Math.pow(-2*q + 2, 2)/2; };
+/* off the ball: facing where he runs, turning to face the ball as he slows (a blend, never a snap) */
+function freeYaw(s, id, T){
+  const t = trackAt(s.T.tr[id], T), b = trackAt(s.T.ball, T).p, sp = Math.hypot(t.v[0], t.v[1]);
+  const toBall = Math.atan2(b[0] - t.p[0], b[1] - t.p[1]);
+  if (sp < 0.05) return toBall;
+  const run = Math.atan2(t.v[0], t.v[1]), w = Math.min(1, Math.max(0, (sp - 0.4)/0.8));
+  return lerpA(toBall, run, w);
+}
+/* The man the ball is going to opens up as soon as it is struck: by the time it
+   arrives he is half-turned, between the ball coming in and the pass he will play,
+   so he takes it on the move toward his next pass. Then he settles square to that
+   pass, behind the ball, and steps through it. Afterwards he turns back to the play
+   over a third of a second. Every change is a blend; nothing happens in one frame.
+   Returns { a: facing (right-wing coords), ts: his strike or null, hold: 0..1 how far
+   he has settled behind the ball } or null when the ball is nothing to do with him. */
+function passFacing(s, id, T){
+  const ev = s.ev, dirU = u => Math.atan2(u[0], u[1]);
+  if (ev[0].role === id && ev[1]){
+    const a = dirU(uOf(ev, 0)), end = ev[1].ts + 350;
+    if (T <= end) return { a };
+    if (T <= end + 300) return { a: lerpA(a, freeYaw(s, id, T), easeQ((T - end)/300)) };
+  }
+  for (let i = 1; i < ev.length; i++){
+    if (ev[i].role !== id) continue;
+    const e = ev[i], nx = ev[i+1];
+    if (T < e.ts) continue;
+    const want = dirU(uOf(ev, i));
+    /* while it travels he gets behind it and turns to face where he will play it */
+    if (T < e.ta) return { a: lerpA(freeYaw(s, id, e.ts), want, easeQ((T - e.ts)/(e.ta - e.ts))) };
+    const end = nx ? nx.ts + 350 : Infinity;
+    if (T <= end) return { a: want };
+    if (T <= end + 300) return { a: lerpA(want, freeYaw(s, id, T), easeQ((T - end)/300)) };
+  }
+  return null;
+}
+/* Bodies turn at a human rate: a quick turn is about a full circle a second, never
+   faster. Worked out once per clip, at 10 ms steps, so a replay is identical.     */
+const TURN_RATE = 6.5;                                        // rad/s
+function bodyYaws(s){
+  const out = {}, end = (s._tEnd || s.tFreeze) + 200, dt = 10;
+  for (const id in s.T.tr){
+    const n = Math.ceil(end/dt) + 1, arr = new Float32Array(n);
+    const want = T => { const pf = passFacing(s, id, T); return pf ? pf.a : freeYaw(s, id, T); };
+    let y = want(0); arr[0] = y;
+    for (let k = 1; k < n; k++){ const d = wrapA(want(k*dt) - y), m = TURN_RATE*dt/1000; y += Math.max(-m, Math.min(m, d)); arr[k] = y; }
+    out[id] = arr;
+  }
+  return out;
+}
+function yawAt(s, id, T){
+  const a = s._yaw[id], f = Math.max(0, T)/10, i = Math.min(a.length - 2, Math.floor(f)), k = Math.min(1, f - i);
+  return a[i] + wrapA(a[i+1] - a[i])*k;
+}
+/* ---------- the grid ----------
+   Across: five lanes, set by the boxes (wide lane to the edge of the 18-yard box,
+   half-space to the edge of the 6-yard box, the middle between). Along: four
+   cross-field sections, as Guardiola's grid is described (5 x 4 = 20 zones; where
+   exactly those lines sit is not published, so they are equal quarters here).
+   The rule of thumb coaches quote: no more than 2 team-mates in one lane, no more
+   than 3 on one horizontal line, so the man on the ball has 2-3 options.          */
+const GRID = { cuts: [-26.25, 0, 26.25], names: ['SECTION 4', 'SECTION 3', 'SECTION 2', 'SECTION 1'] };
+function bandsOf(s){ return GRID; }
+const bandOf = (z, b) => { let i = 0; while (i < b.cuts.length && z >= b.cuts[i]) i++; return i; };
+/* where the team-mates are, for judging a spot: where the play is taking them, or,
+   just after we lose it (when nobody is heading for a shape), where they are */
+function matePos(s){
+  const fin = s.ev[s.ev.length - 1].sh.own, out = {};
+  for (const id in s.ev[0].sh.own){
+    if (s.turn && s.T){ out[id] = trackAt(s.T.tr[id], s.tFreeze + 100).p; }
+    else out[id] = fin[id];
+  }
+  return out;
+}
+/* how a spot sits in the grid: who else is in its lane, and who is on its line */
+function gridCheck(s, p){
+  const own = matePos(s), lane = [], line = [];
+  for (const id in own){ if (id === 'OGK') continue; const q = own[id];
+    if (laneOf(q[0]) === laneOf(p[0])) lane.push({ id, dz: q[1] - p[1] });
+    if (Math.abs(q[1] - p[1]) < 3) line.push(id); }
+  return { lane, line };
+}
+/* orienting yourself: what on the pitch tells you where the spot is */
+const FIND = {
+  attNear: 'Lane: the edge of the 18-yard box, extended up the pitch, is the inside edge of your wide lane &mdash; stay outside it. Height: their last defender is the offside line; be level with him. With their full-back pinned and isolated, your 1v1 can make the difference: beating your man is <i>superioridad cualitativa</i>.',
+  attMid: 'Lane: stay outside the 18-yard-box line, extended. Height: level with their last defender. Stagger: not directly level with your 8 in the next lane &mdash; a slight diagonal gives the passer a real option.',
+  attFar: 'Lane: the inside edge of your wide lane is the 18-yard-box line, extended &mdash; come in to it, not past it. Height: level with their last defender, so the switch can go in behind.',
+  attSwap: 'Lane: the half-space runs between the 18-yard-box edge and the 6-yard-box edge, extended. Height: level with their last defender. Standing between their full-back and centre-back, behind the line pressing us, is a positional advantage (<i>superioridad posicional</i>).',
+  defNear: 'Good pressing technique (general coaching, not specifically Spanish). Reference: their full-back, not the grid. Go as the ball travels to him and finish goal-side and inside him.',
+  defMid: 'General coaching for a 4-1-4-1 block, not specifically Spanish. Height: our midfield line &mdash; level with your 8s. Lane: keep the same gap to your 8 that the 8s keep to each other; close your half-space first.',
+  defFar: 'Height: our midfield line. Lane: slide in until you are in your half-space, between the 18-yard and 6-yard box edges extended &mdash; the whole block moves together.',
+  turnPress: 'Reference: their receiver, not the grid. In the first seconds after we lose it, the ball tells you where to be.',
+  turnCover: 'Reference: the man nearest you who could get the next pass, and the ball. Stand on the line between them, close to him, ball side.'
+};
+const ROLE_NAME = { R8: 'your 8', L8: 'your other 8', RB: 'your full-back', LB: 'the other full-back', S6: 'your 6', N9: 'your 9',
+                    LW: 'the other winger', RCB: 'your centre-back', LCB: 'the other centre-back', OGK: 'your keeper' };
+/* team-mates already on that spot's lane and line (where they are heading in this picture) */
+function boxMates(s, p){
+  const own = matePos(s), out = [];
+  for (const id in own){ const q = own[id]; if (id !== 'OGK' && laneOf(q[0]) === laneOf(p[0]) && Math.abs(q[1] - p[1]) < 6) out.push(id); }
+  return out;
+}
+/* who has the ball at T (null while it travels) */
+function holderAt(s, T){
+  let i = 0; while (i + 1 < s.ev.length && s.ev[i+1].ts <= T) i++;
+  if (i > 0 && T < s.ev[i].ta) return null;
+  return s.ev[i].role;
+}
+const DUR = { normal: [4300, 6500], turn: [3800, 6000] };
+/* every pass has a clean line: nobody of the passer's side within 2.5 m of the ball while it
+   travels (it would be his ball, and it reads as meant for him), nobody of the other side
+   within 1.3 m (he would cut it out); the pass that is cut out is the exception */
+function lanesClean(s){
+  const last = s.ev[s.ev.length - 1], own = id => !!s.ev[0].sh.own[id];
+  s._tEnd = last.ta + 100; const L = simulate(s); s._tEnd = undefined;
+  for (let i = 1; i < s.ev.length; i++){
+    const e = s.ev[i], pr = s.ev[i-1].role, ours = own(pr);
+    for (const id in L.tr){
+      if (id === pr || id === e.role || id === e.meant) continue;
+      const mate = own(id) === ours;
+      if (!mate && e.intercept) continue;
+      const lim = mate ? 2.5 : 1.3;
+      for (let t = e.ts + 100; t <= e.ta - 100; t += 50){
+        const b = trackAt(L.ball, t).p, q = trackAt(L.tr[id], t).p;
+        if (Math.hypot(b[0] - q[0], b[1] - q[1]) < lim) return false;
+      }
+    }
+  }
+  return true;
+}
+function sceneOK(s){
+  if (!s) return false;
+  const dur = s.turn ? DUR.turn : DUR.normal;
+  if (s.tFreeze < dur[0] - 300 || s.tFreeze > dur[1] + 300) return false;
+  /* the play must move him */
+  if (d2(s.ideal, s.start) < 6) return false;
+  const T = tracks(s);
+  if (T.miss > 0.35) return false;                // every receiver meets his ball
+  if (!lanesClean(s)) return false;                // a clean line for every pass
+  { const last = s.ev[s.ev.length - 1];
+    if (last.phase !== 'att' || s.turn){
+      s._tEnd = last.ta + 100; const Lg = simulate(s); s._tEnd = undefined;
+      s._atTa = {}; for (const id in Lg.tr) s._atTa[id] = trackAt(Lg.tr[id], last.ta).p;
+      for (const id in last.sh.opp) if (Lg.tr[id]) last.sh.opp[id] = trackAt(Lg.tr[id], last.ta).p;
+      if (s.turn) s.extra.recv = trackAt(Lg.tr[last.role], last.ta).p;
+      else { const I = idealFor(s.kind, last.sh, s.extra); s.ideal = I.at; s.ref = I.ref; }
+    } }
+  /* offside: their deepest outfield man, at his most restrictive, from the freeze until the
+     play has gone on (the same stretch the drill plays); never offside in our own half */
+  if (s.ev[s.ev.length - 1].phase === 'att' && !s.turn){
+    const last = s.ev[s.ev.length - 1], tE = Math.max(s.tFreeze + 1900, last.ta + 1700);
+    s._tEnd = tE; const Lo = simulate(s); s._tEnd = undefined;
+    let line = -99;
+    for (let t = s.tFreeze; t <= tE; t += 100){
+      let deep = 99; for (const id in Lo.tr){ if (id === 'TGK' || s.ev[0].sh.own[id]) continue; deep = Math.min(deep, trackAt(Lo.tr[id], t).p[1]); }
+      line = Math.max(line, deep);
+    }
+    s.offLine = Math.min(line, 0);
+    if (s.ref.type === 'line' && s.ref.label === 'their last defender'){ s.ref.z = s.offLine; s.ideal = [s.ideal[0], s.offLine + 1]; }
+    else if (s.ideal[1] < s.offLine + 1) s.ideal = [s.ideal[0], s.offLine + 1];
+    if (d2(s.ideal, s.start) < 6) return false;
+  }
+  for (let i = 1; i < s.ev.length; i++) if (s.ev[i].len < (s.ev[i].intercept ? 6 : PASS_MIN - 1) || s.ev[i].len > PASS_MAX + 1.5) return false;
+  if (s.tFreeze < dur[0] || s.tFreeze > dur[1]) return false;
+  if (s.turn){
+    /* their outlet is on his side and close: he presses it, from the outside in.
+       Anywhere else, the men near it press and he closes inside */
+    const r = s.extra.recv, mine = d2(s.start, r);
+    s.kind = (mine < 16 && r[0] > 5) ? 'turnPress' : 'turnCover';
+    const I = idealFor(s.kind, s.ev[s.ev.length-1].sh, s.extra); s.ideal = I.at; s.ref = I.ref; s.intended = s.kind;
+    if (s.kind === 'turnCover'){
+      /* Presión tras pérdida (Coaches' Voice): the men nearest the ball press it; the ones
+         further away mark the nearest potential receiver or cover the passing lines. Far
+         from the ball he does not chase it: he takes the man of theirs nearest him who could
+         get the next pass, and gets on the line from the ball to him, a couple of metres
+         off him, ball side. */
+      const ownNow = []; for (const id in s.ev[0].sh.own) ownNow.push(s._atTa[id]);      // everyone as the ball arrives
+      let man = null, manId = null;
+      for (const id in s.ev[0].sh.opp){
+        if (id === 'TGK' || id === s.extra.role) continue;
+        const q = s._atTa[id];
+        if (ownNow.some(m => d2(m, q) < 4)) continue;                    // already marked
+        if (d2(q, s.start) > 22) continue;                                 // not his: too far away
+        if (!man || d2(q, s.start) < d2(man, s.start)){ man = q; manId = id; }
+      }
+      if (!man) return false;
+      const L = d2(man, r) || 1, kk = Math.min(2.5, L/2)/L;
+      s.ideal = pitch([man[0] + (r[0]-man[0])*kk, man[1] + (r[1]-man[1])*kk]);
+      s.ref = { type: 'man', id: manId, label: 'the nearest man who could get the next pass', how: 'on the line from the ball to him, a couple of metres off him, so the pass to him is shut' };
+      s.extra.free = man; s.extra.cover = manId;
+      if (ownNow.some(m => d2(m, s.ideal) < 5)) return false;           // a team-mate already has him
+    }
+    if (d2(s.ideal, s.start) > 22) return false;                         // nobody sprints half the pitch back to press
+    if (d2(s.ideal, s.start) < 6) return false;
+  }
+  /* his spot is his: no team-mate on it, where they are and where they are going */
+  const fin = s.ev[s.ev.length-1].sh.own;
+  for (const id in s.ev[0].sh.own){
+    const k = T.tr[id], p = [k[k.length-1][1], k[k.length-1][2]];
+    if (s.kind === 'turnPress' && T.pressers && T.pressers.includes(id)){ if (d2(p, s.ideal) < 3) return false; continue; }
+    if (d2(p, s.ideal) < 6) return false;
+    const pf = trackAt(T.tr[id], s.tFreeze).p;                       // as he is in the frozen picture
+    if (id !== 'OGK' && laneOf(pf[0]) === laneOf(s.ideal[0]) && Math.abs(pf[1] - s.ideal[1]) < 6) return false;
+    if (!s.turn && fin[id] && d2(fin[id], s.ideal) < 6) return false;
+  }
+  /* in the frozen picture, with him still where he started, no team-mate stands in his zone
+     (with the ball: same lane, within 6 m; without it: within 4 m): team-mates do not run onto
+     a man who is already there. The one exception is the full-back's overlap past him, which
+     is the cue in that rep. */
+  const withBall = s.ev[s.ev.length - 1].phase === 'att' && !s.turn, goingTo = s.ev[s.ev.length - 1].sh.own;
+  for (const id in s.ev[0].sh.own){
+    if (id === 'OGK' || (s.kind === 'attSwap' && id === 'RB')) continue;
+    const g = goingTo[id];                                                // nor where he is heading
+    if (withBall && g && laneOf(g[0]) === laneOf(s.start[0]) && Math.abs(g[1] - s.start[1]) < 6) return false;
+    for (let Tm = 0; Tm <= s.tFreeze + 1; Tm += 100){                    // the whole clip, and the frozen picture
+      const q = trackAt(T.tr[id], Math.min(Tm, s.tFreeze)).p;
+      if (withBall){ if (laneOf(q[0]) === laneOf(s.start[0]) && Math.abs(q[1] - s.start[1]) < 6) return false; }
+      else if (Math.hypot(q[0] - s.start[0], q[1] - s.start[1]) < (Tm >= s.tFreeze ? 4 : 3)) return false;   // without the ball: never on top of him
+    }
+  }
+  /* nobody runs through him: he is the camera */
+  for (const id in T.tr) for (const k of T.tr[id]) if (Math.hypot(k[1] - s.start[0], k[2] - s.start[1]) < 2.6) return false;
+  for (const k of T.ball) if (Math.hypot(k[1] - s.start[0], k[2] - s.start[1]) < 2.2) return false;
+  s.T = T;
+  /* while we have it, the team itself keeps the spacing at every moment the ball arrives
+     (Perarnau: at most 2 in a vertical lane, at most 3 on a horizontal line; and no two
+     in one zone of the grid, the same lane within 6 m up or down), checked every 0.1 s */
+  const ci = s.ev.findIndex(e => e.intercept), tHave = s.ev[0].phase !== 'att' ? -1 : ci > 0 ? s.ev[ci].ta : s.tFreeze;
+  for (let Tm = 0; Tm <= tHave; Tm += 100){
+    const pl = []; for (const id in s.ev[0].sh.own){ if (id === 'OGK') continue; pl.push(trackAt(T.tr[id], Tm).p); }
+    const lanes = {}; pl.forEach(p => { const l = laneOf(p[0]); lanes[l] = (lanes[l] || 0) + 1; });
+    for (const l in lanes) if (lanes[l] > 2) return false;
+    for (const p of pl) if (pl.filter(q => Math.abs(q[1] - p[1]) < 3).length > 3) return false;
+    for (let a = 0; a < pl.length; a++) for (let b = a + 1; b < pl.length; b++)
+      if (laneOf(pl[a][0]) === laneOf(pl[b][0]) && Math.abs(pl[a][1] - pl[b][1]) < 6) return false;
+  }
+  /* the answer never puts him on a team-mate's lane and line */
+  if (boxMates(s, s.ideal).length) return false;
+  return true;
+}
+function makeScene(side, key){
+  if (!BAG_COUNT[key]) key = 'attFar';
+  const turn = key.startsWith('turn');
+  for (let i = 0; i < (turn ? 1500 : 900); i++){ const s = candidate(side, turn ? 'turnover' : key);
+    if (turn && s && (key === 'turnPress' ? !(d2(s.start, s.extra.recv) < 15 && s.extra.recv[0] > 6) : d2(s.start, s.extra.recv) < 13)) continue;
+    if (sceneOK(s) && (!turn || s.kind === key)) return s; }
+  if (key !== 'attFar') return makeScene(side, 'attFar');
+  for (;;){ const s = candidate(side, key); if (s){ if (sceneOK(s)) return s; } }
+}
+const OPTIONS = [];
+const TIER_NAME = ['Missed', 'Close', 'Good', 'Spot on'];
+function scoreScene(s){ return []; }
+function recvPoint(a, s){ return [s.ideal[0] - s.start[0], s.ideal[1] - s.start[1]]; }
+
+/* ---------------- 3D ---------------- */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+stage.insertBefore(renderer.domElement, stage.firstChild);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a1410);
+scene.fog = new THREE.Fog(0x0a1410, 60, 130);
+scene.add(new THREE.HemisphereLight(0xd6e8ff, 0x24422d, 0.95));
+const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+sun.position.set(-25, 40, 25); scene.add(sun);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 300);
+
+/* The path he should have run, laid ON the grass as geometry rather than
+   painted over the top of everything. Drawn flat at boot height, so a player
+   standing in the way hides the part behind him \u2014 an overlay went straight
+   through people. */
+const pathGroup = new THREE.Group();
+function clearPath(){ while (pathGroup.children.length) pathGroup.remove(pathGroup.children[0]); }
+function drawPath3D(s){
+  clearPath();
+  const r = recvPoint(s.intended, s);
+  const ax = s.side*s.wingX, az = s.zBase;
+  const bx = s.side*(s.wingX + r[0]), bz = s.zBase + r[1];
+  const mat = new THREE.MeshBasicMaterial({ color: 0xc6ef2f });
+  const dx = bx-ax, dz = bz-az, L = Math.hypot(dx, dz) || 1;
+  const ux = dx/L, uz = dz/L, yaw = Math.atan2(ux, uz);
+
+  for (let d = 1.9; d < L - 1.5; d += 0.95){
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.02, 0.55), mat);
+    m.position.set(ax + ux*(d + 0.27), 0.05, az + uz*(d + 0.27));
+    m.rotation.y = yaw;
+    pathGroup.add(m);
+  }
+  for (let i = 0; i < 18; i++){
+    const a0 = i/18 * Math.PI*2;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.02, 0.45), mat);
+    m.position.set(bx + Math.cos(a0)*1.45, 0.05, bz + Math.sin(a0)*1.45);
+    m.rotation.y = -a0;
+    pathGroup.add(m);
+  }
+}
+
+function setFov(){
+  const half = (CFG.hFov * Math.PI / 180) / 2;
+  const v = 2 * Math.atan(Math.tan(half) / Math.max(camera.aspect, 0.2));
+  camera.fov = Math.min(v * 180 / Math.PI, CFG.vFovMax);
+  camera.updateProjectionMatrix();
+}
+
+function turfTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  for (let i = 0; i < 8; i++){ g.fillStyle = i % 2 ? '#31803f' : '#256030'; g.fillRect(0, i*32, 256, 32); }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1, 4);   // 160 m over 32 bands = one mowing stripe every 5 m
+  return t;
+}
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(150,160),
+  new THREE.MeshLambertMaterial({ map: turfTexture() }));
+ground.rotation.x = -Math.PI/2; scene.add(ground);
+
+const lineMat = new THREE.MeshBasicMaterial({ color: 0xdfe8e0 });
+/* The whole pitch, both ends, to the Laws of the Game (Law 1), in metres: 105 x 68;
+   lines 12 cm wide, part of the areas they bound (measured to their outside edges);
+   goal area 5.5 m out and 5.5 m either side of the posts (18.32 x 5.5); penalty area
+   16.5 m out and 16.5 m either side (40.32 x 16.5); penalty mark 11 m; arcs and centre
+   circle 9.15 m; corner arcs 1 m; goals 7.32 m between the posts, 2.44 m to the bar,
+   posts and bar 12 cm, on the goal line.                                              */
+const LW = 0.12, HL = 52.5, HW = 34;
+function stripe(x,z,w,d){ const m = new THREE.Mesh(new THREE.BoxGeometry(w,0.02,d), lineMat);
+  m.position.set(x,0.02,z); scene.add(m); }
+function lineSeg(x0, z0, x1, z1){ const L = Math.hypot(x1-x0, z1-z0), m = new THREE.Mesh(new THREE.BoxGeometry(LW, 0.02, L + 0.01), lineMat);
+  m.position.set((x0+x1)/2, 0.021, (z0+z1)/2); m.rotation.y = Math.atan2(x1-x0, z1-z0); scene.add(m); }
+function arc(cx, cz, r, a0, a1, n){ for (let i = 0; i < n; i++){ const p = a0 + (a1-a0)*i/n, q = a0 + (a1-a0)*(i+1)/n;
+  lineSeg(cx + r*Math.sin(p), cz + r*Math.cos(p), cx + r*Math.sin(q), cz + r*Math.cos(q)); } }
+const IN = HL - LW/2, SX = HW - LW/2;                        // centre of the goal lines and touchlines
+stripe(-SX, 0, LW, 2*HL); stripe(SX, 0, LW, 2*HL);           // touchlines
+stripe(0, 0, 2*HW, LW);                                      // halfway line
+arc(0, 0, 9.15 - LW/2, 0, 2*Math.PI, 64);                    // centre circle
+stripe(0, 0, 0.24, 0.24);                                    // centre mark
+[-1, 1].forEach(d => {                                       // d = -1: the end we attack; +1: our end
+  const gl = d*IN, inward = -d;                              // the goal line, and the way into the pitch
+  stripe(0, gl, 2*HW, LW);                                   // goal line
+  const box = (half, depth) => {                             // an area: its front line and its two sides
+    const zf = d*HL + inward*(depth - LW/2), zm = d*HL + inward*depth/2;
+    stripe(0, zf, 2*half, LW);
+    stripe(-(half - LW/2), zm, LW, depth); stripe(half - LW/2, zm, LW, depth);
+  };
+  box(3.66 + 16.5, 16.5);                                    // penalty area: 40.32 x 16.5
+  box(3.66 + 5.5, 5.5);                                      // goal area: 18.32 x 5.5
+  const spot = d*HL + inward*11;
+  stripe(0, spot, 0.24, 0.24);                               // penalty mark, 11 m
+  const lim = Math.acos((16.5 - 11)/9.15);                   // the arc: 9.15 m from the mark, outside the area only
+  arc(0, spot, 9.15 - LW/2, d < 0 ? -lim : Math.PI - lim, d < 0 ? lim : Math.PI + lim, 20);
+  [-1, 1].forEach(sx => {                                    // corner arcs, 1 m
+    const a = Math.atan2(-sx, inward);
+    arc(sx*SX, gl, 1 - LW/2, a - Math.PI/4, a + Math.PI/4, 8);
+  });
+});
+
+/* The goals — the best reference he has for judging how far up the pitch everything is,
+   and which way he is facing. */
+function netTexture(rx, ry){
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 1.4;
+  for (let i = 0; i <= 64; i += 8){
+    g.beginPath(); g.moveTo(i,0); g.lineTo(i,64); g.stroke();
+    g.beginPath(); g.moveTo(0,i); g.lineTo(64,i); g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry);
+  return t;
+}
+function netPanel(w, h, rx, ry){
+  return new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({
+    map: netTexture(rx,ry), transparent:true, opacity:0.5,
+    side: THREE.DoubleSide, depthWrite:false }));
+}
+const GOAL_Z = -HL, GOAL_D = 2.0, POST = 3.66, BAR = 2.44, PR = 0.06;   // 7.32 between the posts, 2.44 under the bar, 12 cm frame
+const frameMat = new THREE.MeshLambertMaterial({ color: 0xf5f8f3 });
+[-1, 1].forEach(d => {
+  const gz = d*(HL - PR), back = d;                          // the frame sits on the goal line; the net behind it
+  [-1, 1].forEach(sx => {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(PR, PR, BAR + 2*PR, 12), frameMat);
+    post.position.set(sx*(POST + PR), (BAR + 2*PR)/2, gz); scene.add(post);
+  });
+  const crossbar = new THREE.Mesh(new THREE.CylinderGeometry(PR, PR, 2*(POST + 2*PR), 12), frameMat);
+  crossbar.rotation.z = Math.PI/2; crossbar.position.set(0, BAR + PR, gz); scene.add(crossbar);
+  const nb = netPanel(POST*2, BAR, 8, 3); nb.position.set(0, BAR/2, d*(HL + GOAL_D)); scene.add(nb);
+  const nt = netPanel(POST*2, GOAL_D, 8, 2); nt.rotation.x = -Math.PI/2; nt.position.set(0, BAR, d*(HL + GOAL_D/2)); scene.add(nt);
+  [-1, 1].forEach(sx => {
+    const sd = netPanel(GOAL_D, BAR, 2, 3);
+    sd.rotation.y = Math.PI/2; sd.position.set(sx*POST, BAR/2, d*(HL + GOAL_D/2)); scene.add(sd);
+  });
+});
+
+const actors = new THREE.Group(); scene.add(actors);
+scene.add(pathGroup);
+
+/* A jointed figure. Body direction comes from the stride and shoulders,
+   head direction from the face — and the two can disagree, which is
+   exactly the cue a winger has to pick up. */
+const SKINS = [0xf2d8b8, 0xe8c9a0, 0xc9985f, 0x9a6238, 0x6b4126];
+const HAIRS = [0x2a1d16, 0x14100c, 0x5a3a20, 0x8f7040, 0x1c1c1c];
+const BOOTS = [0xf2f5ef, 0xf5d33a, 0xff4f9d, 0x2ee6a8, 0x1a1a1a, 0xff8a2b];
+
+function makePlayer(color, mps, look){
+  const run = mps > 0.5;
+  look = look || {};
+  const HIP = 0.86;
+  const g = new THREE.Group();
+  const kit   = new THREE.MeshLambertMaterial({ color });
+  const skin  = new THREE.MeshLambertMaterial({ color: look.skin || CFG.colors.skin });
+  const hairM = new THREE.MeshLambertMaterial({ color: look.hair || 0x2a1d16 });
+  const shortM= new THREE.MeshLambertMaterial({ color: 0x16221a });
+  const bootM = new THREE.MeshLambertMaterial({ color: look.boot || 0xf2f5ef });
+
+  /* Cadence and stride length come from how fast he is ACTUALLY travelling, so
+     the legs and the ground agree instead of the figure appearing to skate.
+     A 12-year-old at 4.4 m/s takes about three strides a second \u2014 roughly a
+     1.5 m stride \u2014 and far shorter, slower ones at a jockeying pace. */
+  const freq = run ? 1.55 + 0.32*mps : 0.9;          // strides per second
+  const amp  = run ? Math.min(0.95, 0.22 + 0.145*mps) : 0.10;
+  const lean = 0.03 + 0.036*mps;
+  const legs = [], arms = [];
+
+  /* Positive rotation.x swings a limb BACKWARD. Hip flexion is negative,
+     knee flexion positive and never below zero. */
+  const hips = new THREE.Group(); hips.position.y = HIP; g.add(hips);
+  [[-0.115, 1], [0.115, -1]].forEach(([lx, sgn]) => {
+    const leg = new THREE.Group(); leg.position.x = lx;
+    const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.088,0.075,0.42,8), shortM);
+    thigh.position.y = -0.21; leg.add(thigh);
+    const knee = new THREE.Group(); knee.position.y = -0.42;
+    const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.072,0.055,0.40,8), skin);
+    shin.position.y = -0.20; knee.add(shin);
+    const ankle = new THREE.Group(); ankle.position.y = -0.40;
+    const boot = new THREE.Mesh(new THREE.BoxGeometry(0.115,0.075,0.24), bootM);
+    boot.position.set(0,-0.04,0.06); ankle.add(boot);
+    knee.add(ankle); leg.add(knee); hips.add(leg);
+    legs.push({ leg, knee, ankle, sgn });
+  });
+
+  const upper = new THREE.Group();
+  upper.position.y = HIP; upper.rotation.x = lean; g.add(upper);
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.50,0.60,0.27), kit);
+  torso.position.y = 0.30; upper.add(torso);
+  const shoulders = new THREE.Mesh(new THREE.BoxGeometry(0.58,0.15,0.28), kit);
+  shoulders.position.y = 0.55; upper.add(shoulders);
+
+  [[-0.32, -1], [0.32, 1]].forEach(([ax, sgn]) => {
+    const arm = new THREE.Group();
+    arm.position.set(ax, 0.52, 0); arm.rotation.z = sgn * 0.12;
+    const up = new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.05,0.34,7), kit);
+    up.position.y = -0.17; arm.add(up);
+    const elbow = new THREE.Group(); elbow.position.y = -0.34;
+    const fore = new THREE.Mesh(new THREE.CylinderGeometry(0.048,0.042,0.32,7), skin);
+    fore.position.y = -0.16; elbow.add(fore);
+    arm.add(elbow); upper.add(arm);
+    arms.push({ arm, elbow, sgn });
+  });
+
+  const head = new THREE.Group();
+  head.position.y = 0.83; head.rotation.x = -lean; upper.add(head);
+  head.add(new THREE.Mesh(new THREE.SphereGeometry(0.135,16,12), skin));
+  const hair = new THREE.Mesh(
+    new THREE.SphereGeometry(0.143,16,12, 0, Math.PI*2, 0, Math.PI*0.62), hairM);
+  hair.position.z = -0.03; head.add(hair);
+  const eyeM = new THREE.MeshBasicMaterial({ color: 0x0d0d0d });
+  [-0.052, 0.052].forEach(ex => {
+    const e = new THREE.Mesh(new THREE.SphereGeometry(0.028,8,6), eyeM);
+    e.position.set(ex, 0.018, 0.118); head.add(e);
+  });
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.028,0.07,6), skin);
+  nose.rotation.x = Math.PI/2; nose.position.set(0,-0.02,0.135); head.add(nose);
+
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.36, 20),
+    new THREE.MeshBasicMaterial({ color:0x000000, transparent:true,
+                                  opacity:0.30, depthWrite:false }));
+  shadow.rotation.x = -Math.PI/2; shadow.position.y = 0.03;
+  shadow.scale.z = 0.7; g.add(shadow);
+
+  const phase0 = Math.random() * Math.PI * 2;
+  g.userData.head  = head;
+  g.userData.upper = upper;
+  g.userData.pose = tSec => {
+    const w = phase0 + tSec * freq * Math.PI * 2;
+    legs.forEach(({leg, knee, ankle, sgn}) => {
+      const u = Math.sin(w) * sgn * amp;
+      const flex = run ? 0.28 + 1.60*Math.max(0, u) : 0.10;
+      leg.rotation.x   = u * 0.80;
+      knee.rotation.x  = flex;
+      ankle.rotation.x = -0.55*flex + 0.12;
+    });
+    arms.forEach(({arm, elbow, sgn}) => {
+      arm.rotation.x   = Math.sin(w) * sgn * amp * (run ? 0.85 : 0.15);
+      elbow.rotation.x = run ? -0.50 - 0.15*mps : -0.25;
+    });
+  };
+  g.userData.pose(0);
+  return g;
+}
+
+let placed = [];
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+function wrap(a){ while (a >  Math.PI) a -= Math.PI*2;
+                  while (a < -Math.PI) a += Math.PI*2; return a; }
+
+/* moveOx/moveOz say where he is RUNNING. opt.watch turns the torso and
+   head back onto the receiver, within the twist a real player has:
+   about 50 degrees at the waist, 70 more at the neck. */
+function place(kind, ox, oz, s, moveOx, moveOz, tag, opt){
+  opt = opt || {};
+  const speed = opt.speed || 0;
+  const W = s.wingX || CFG.wingX;
+  const x = s.side*(W + ox), z = s.zBase + oz;      // where he ENDS the look
+  const mps = opt.mps === undefined ? speed * CFG.mps.sprint : opt.mps;
+  if (opt.pre === undefined) opt.pre = mps >= 2.4 ? 1.4 : (mps >= 0.35 ? Math.min(mps, 1.0) : 0);
+  const p = makePlayer(opt.color || (kind === 'own' ? CFG.colors.own : CFG.colors.opp), mps,
+    { skin: pick(SKINS), hair: pick(HAIRS), boot: pick(BOOTS) });
+
+  const wa = opt.watchAt || [0,0];
+  const toRec = Math.atan2(s.side*(W + wa[0]) - x, (s.zBase + wa[1]) - z);
+  const moveYaw = speed > 0.05
+    ? Math.atan2(s.side*(W + moveOx) - x, (s.zBase + moveOz) - z)
+    : toRec;
+  /* A backpedalling defender travels one way and faces another: chest stays
+     on the ball while his feet carry him back. */
+  const faceYaw = opt.backpedal ? toRec : moveYaw;
+  p.rotation.y = faceYaw;
+
+  if (opt.watch){
+    const d = wrap(toRec - faceYaw);
+    const wm = opt.waistMax === undefined ? 0.9 : opt.waistMax, waist = clamp(d, -wm, wm);
+    p.userData.upper.rotation.y = waist;
+    p.userData.head.rotation.y  = clamp(d - waist, -1.2, 1.2);
+  }
+
+  /* rewind him to where he was when the look began */
+  const run = mps * (CFG.flashMs/1000);
+  const sx = x - Math.sin(moveYaw)*run, sz = z - Math.cos(moveYaw)*run;
+  p.position.set(sx, 0, sz);
+
+  /* A marker floating over the man on the ball. Half a second is not long
+     enough to hunt for him, and everything in the picture is judged relative
+     to where the pass is coming from. */
+  if (opt.flag){
+    const flagM = new THREE.MeshBasicMaterial({ color: 0xff2d1f });
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.13,1.4,10), flagM);
+    shaft.position.y = 3.75; p.add(shaft);
+    const headM = new THREE.Mesh(new THREE.ConeGeometry(0.52,1.25,14), flagM);
+    headM.rotation.x = Math.PI; headM.position.y = 2.45; p.add(headM);
+  }
+
+  actors.add(p);
+  placed.push({ mesh:p, tag, kind, sx, sz, ex:x, ez:z, pose:p.userData.pose,
+                dx: Math.sin(moveYaw), dz: Math.cos(moveYaw), pre: speed > 0.05 ? opt.pre : 0 });
+}
+
+/* before the look: t < 0 seconds, everyone drifting into the picture they will make */
+function setPre(t){
+  placed.forEach(o => { if (o.custom) return;
+    o.mesh.position.x = o.sx + o.dx*o.pre*t;
+    o.mesh.position.z = o.sz + o.dz*o.pre*t;
+    o.pose(t);
+  });
+}
+
+/* k = 0 at the start of the look, 1 at the end */
+function setPhase(k, tSec){
+  placed.forEach(o => { if (o.custom) return;
+    o.mesh.position.x = o.sx + (o.ex - o.sx)*k;
+    o.mesh.position.z = o.sz + (o.ez - o.sz)*k;
+    o.pose(tSec);
+  });
+}
+
+const GK_COL = { OGK: 0xf5d42a, TGK: 0x9b5de5 };                       // our keeper yellow, theirs purple
+const GK_CSS = { OGK: '#f5d42a', TGK: '#9b5de5' };
+function buildScene(s){
+  while (actors.children.length) actors.remove(actors.children[0]);
+  placed = []; passerRig = null; ACT = {};
+  document.getElementById('mapwrap').style.display = 'none';
+  Object.keys(s.T.tr).forEach(id => {
+    const own = !!s.ev[0].sh.own[id], kind = (id === 'TGK' || id === 'OGK') ? 'gk' : own ? 'own' : 'opp';
+    const p0 = s.T.tr[id][0];
+    place(kind, p0[1] - s.wingX, p0[2] - s.zBase, s, p0[1] - s.wingX, p0[2] - s.zBase - 1, null, { speed: 0.6, mps: 3.47, pre: 0, color: GK_COL[id] });
+    const e = placed[placed.length - 1]; e.custom = true; ACT[id] = e;
+  });
+  const bl = new THREE.Mesh(new THREE.SphereGeometry(0.115, 24, 16), LOOK.ballMaterial());
+  bl.castShadow = true; actors.add(bl); ballMesh = bl;
+  /* who has it: a bright ring at his feet, so the ball can be found from 50 m */
+  carrierRing = new THREE.Mesh(new THREE.RingGeometry(0.75, 1.0, 40),
+    new THREE.MeshBasicMaterial({ color: 0xfff27a, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
+  carrierRing.rotation.x = -Math.PI/2; carrierRing.position.y = 0.03; actors.add(carrierRing);
+  s._yaw = bodyYaws(s);                         // how every body turns through the clip
+  laneLines.visible = learning();
+  document.getElementById('radar').style.display = 'none';   // no live map: he builds the picture himself
+}
+/* the radar: the same sideways map as the answer, live */
+function buildRadar(s){
+  const svg = document.getElementById('radar');
+  svg.innerHTML = ''; RADAR = null;
+  svg.style.display = 'none';
+  if (!learning()) return;
+  const g = svgEl('g', { transform: 'matrix(0 1 -1 0 0 0)' }, svg);
+  svgEl('rect', { x: -34, y: -52.5, width: 68, height: 105, fill: '#2f7d3b', opacity: .85 }, g);
+  svgEl('rect', { x: -34, y: -52.5, width: 68, height: 105, fill: 'none', stroke: '#dfe8e0', 'stroke-width': .6, opacity: .8 }, g);
+  svgEl('line', { x1: -34, y1: 0, x2: 34, y2: 0, stroke: '#dfe8e0', 'stroke-width': .5, opacity: .7 }, g);
+  LANES.forEach(x => svgEl('line', { x1: x, y1: -52.5, x2: x, y2: 52.5, stroke: '#fff', 'stroke-width': .4, 'stroke-dasharray': '2 1.6', opacity: .45 }, g));
+  const dots = {};
+  Object.keys(s.T.tr).forEach(id => {
+    const own = !!s.ev[0].sh.own[id], col = GK_CSS[id] ? GK_CSS[id] : own ? '#5aa9ff' : '#ff5a3c';
+    dots[id] = svgEl('circle', { r: 1.9, fill: col, stroke: own ? '#fff' : '#300', 'stroke-width': .35 }, g);
+  });
+  const me = svgEl('circle', { cx: s.side*s.start[0], cy: s.start[1], r: 2.2, fill: 'none', stroke: '#5aa9ff', 'stroke-width': .9 }, g);
+  const ball = svgEl('circle', { r: 1.3, fill: '#fff', stroke: '#000', 'stroke-width': .3 }, g);
+  RADAR = { dots, ball };
+}
+function drawRadar(s, T){
+  if (!RADAR) return;
+  document.getElementById('radar').style.display = 'block';
+  for (const id in RADAR.dots){ const p = trackAt(s.T.tr[id], T).p; RADAR.dots[id].setAttribute('cx', s.side*p[0]); RADAR.dots[id].setAttribute('cy', p[1]); }
+  const b = trackAt(s.T.ball, T).p; RADAR.ball.setAttribute('cx', s.side*b[0]); RADAR.ball.setAttribute('cy', b[1]);
+}
+
+function aimReview(s){ }
+/* The shoulder check. The rep opens with his eyes on the ball carrier, then
+   his head turns to the usual look. A winger knows where the ball is because
+   he has just checked it \u2014 this is that check, and the habit it trains is
+   the point of the whole suite. */
+let passerRig = null, ballMesh = null, seqCam = null, ACT = {}, carrierRing = null, RADAR = null;
+/* the five lanes, painted the way Spanish academies mark a training pitch */
+const laneLines = new THREE.Group();
+[-20.16, -9.16, 9.16, 20.16].forEach(x => {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.14, 105),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.42, depthWrite: false }));
+  m.rotation.x = -Math.PI/2; m.position.set(x, 0.015, 0); laneLines.add(m);
+});
+scene.add(laneLines);
+
+/* k runs 0 to 1: he plants, draws the kicking leg back and leans over it */
+function windUp(k){
+  if (!passerRig) return;
+  const draw = Math.max(0, (k - 0.45) / 0.55);
+  const legs = passerRig.userData.legs || [];
+  legs.forEach(({ leg, knee }, i) => {
+    if (i === 0){ leg.rotation.x = -draw*0.75; knee.rotation.x = draw*0.95; }
+    else { leg.rotation.x = draw*0.22; knee.rotation.x = 0.12; }
+  });
+  passerRig.userData.upper.rotation.x = draw*0.16;
+  passerRig.rotation.z = -draw*0.05;
+}
+
+/* the camera is his eyes: where he stands, and a yaw and pitch for his head */
+function camYP(px, pz, yaw, pitch){
+  reviewing = false; camAim = null; seqCam = [px, pz, yaw, pitch];
+  camera.position.set(px, CFG.eyeHeight, pz);
+  setFov();
+  camera.lookAt(px + Math.sin(yaw)*Math.cos(pitch)*10, CFG.eyeHeight + Math.sin(pitch)*10,
+                pz + Math.cos(yaw)*Math.cos(pitch)*10);
+}
+function ypTo(px, pz, tx, ty, tz){
+  const dx = tx - px, dz = tz - pz;
+  return [Math.atan2(dx, dz), Math.atan2(ty - CFG.eyeHeight, Math.hypot(dx, dz))];
+}
+const ease = q => q < 0.5 ? 2*q*q : 1 - Math.pow(-2*q + 2, 2)/2;
+function mixYP(a, b, q){
+  let d = b[0] - a[0]; while (d > Math.PI) d -= 2*Math.PI; while (d < -Math.PI) d += 2*Math.PI;
+  return [a[0] + d*q, a[1] + (b[1] - a[1])*q];
+}
+
+/* One moment of the build-up, T ms after the veil lifts. Pure function of T,
+   so the replay is the identical picture.
+     0 .. wind          his full-back shapes up and strikes it
+     ~0.35 wind ..      he checks inside while the ball is still at that man's feet
+     wind .. recv       the pass rolls to him; his eyes come back and follow it in
+     recv .. +flash     first touch inside, then the 45-degree carry, head up    */
+function seqTimes(){ return { end: current ? current.tFreeze + (current.tl ? current.tl.total : 0) : 5000 }; }
+/* after the freeze the rep is a timeline: runs with the play frozen, pauses, then the play going on */
+function tlAt(s, T){
+  let u = T - s.tFreeze, off = 0, me = [s.side*s.start[0], s.start[1]], W = s.tFreeze, v = 0, dist = 0, moving = 0;
+  for (const g of s.tl.segs){
+    const k = Math.min(Math.max(u - off, 0), g.dur);
+    if (g.kind === 'run'){ const q = trackAt(g.tr, k); me = q.p; if (u - off <= g.dur && u >= off){ v = Math.hypot(q.v[0], q.v[1]); dist = q.dist; moving = u - off; } }
+    if (g.kind === 'play') W = s.tFreeze + k;
+    if (u < off + g.dur) break;
+    off += g.dur;
+  }
+  return { W: Math.min(W, s.tFreeze + 1e9), p: me, v, dist, moving };
+}
+/* a run with the play frozen: round anyone in the way, up to speed, easing into the spot */
+function framePath(s, from, to){
+  to = [Math.max(-33, Math.min(33, to[0])), Math.max(-51.5, Math.min(51.5, to[1]))];
+  const d0 = Math.hypot(to[0] - from[0], to[1] - from[1]), DTR = 50, tr = [[0, from[0], from[1]]];
+  const them = Object.keys(s.T.tr).map(id => { const q = at100(s.T.tr[id], s.tFreeze); return [s.side*q[0], q[1]]; });
+  let p = from.slice(), v = 0, t = 0, stuck = 0;
+  const tMax = (d0/RUN_V + RUN_V/RUN_A)*1000 + 2500;
+  while (t < tMax){
+    t += DTR;
+    const dx = to[0] - p[0], dz = to[1] - p[1], dist = Math.hypot(dx, dz);
+    if (dist < 0.05 || (dist < 4 && stuck > 5)) break;
+    let hx = dx/dist, hz = dz/dist;
+    if (dist > 1.2){ const fx = hx, fz = hz;
+      for (const q of them){ const rx = q[0] - p[0], rz = q[1] - p[1], rd = Math.hypot(rx, rz);
+        if (rd > 4 || rd < 1e-3 || rd > dist + 1) continue;
+        const ahead = (rx*fx + rz*fz)/rd;
+        if (ahead > 0.2){ const cross = fx*rz - fz*rx, nx = cross > 0 ? fz : -fz, nz = cross > 0 ? -fx : fx, k = (4 - rd)/4*1.6*ahead; hx += nx*k; hz += nz*k; } } }
+    for (const q of them){ const rx = q[0] - p[0], rz = q[1] - p[1], rd = Math.hypot(rx, rz); if (rd < 1.4 && rd > 1e-3){ const k = (1.4 - rd)/1.4*3; hx -= rx/rd*k; hz -= rz/rd*k; } }
+    const hl = Math.hypot(hx, hz) || 1; hx /= hl; hz /= hl;
+    const want = Math.min(RUN_V, Math.sqrt(2*RUN_A*dist));
+    v = want > v ? Math.min(want, v + RUN_A*DTR/1000) : want;
+    const st = Math.min(dist, v*DTR/1000), np = [p[0] + hx*st, p[1] + hz*st];
+    stuck = Math.hypot(np[0] - to[0], np[1] - to[1]) > dist - 0.05 ? stuck + 1 : 0;
+    p = np; tr.push([t, p[0], p[1]]);
+  }
+  tr.push([t + 1, p[0], p[1]]);
+  return { tr, dur: t + 1, end: p };
+}
+/* the play going on from the freeze: until their man has the ball and a moment more */
+function extendPlay(s){
+  const last = s.ev[s.ev.length - 1], dur = Math.max(1600, last.ta - s.tFreeze + 1400);
+  s._tEnd = s.tFreeze + dur + 300; s.T = simulate(s); s._yaw = bodyYaws(s);
+  return dur;
+}
+let fixPending = null;
+/* His run to the spot he picked: he goes the moment he picks it, accelerating like a
+   player (5 m/s per second up to 7 m/s, the same as everyone else in the clip),
+   slowing into the spot and going round anyone in his way. Eyes on the ball all the way. */
+const RUN_V = 7.0, RUN_A = 5.0, RUN_HOLD = 600;
+function at100(k, T){                                     // a track (100 ms samples) at T, quickly
+  const i = Math.max(0, Math.min(k.length - 2, Math.floor(T/100))), a = k[i], b = k[i+1];
+  if (!b) return [a[1], a[2]];
+  const f = Math.max(0, Math.min(1, (T - a[0])/Math.max(1, b[0] - a[0])));
+  return [a[1] + (b[1]-a[1])*f, a[2] + (b[2]-a[2])*f];
+}
+function planRun(s, spot){
+  const me = [s.side*s.start[0], s.start[1]];
+  const to = [Math.max(-33, Math.min(33, spot[0])), Math.max(-51.5, Math.min(51.5, spot[1]))];
+  const d0 = Math.hypot(to[0] - me[0], to[1] - me[1]);
+  /* the rest of the play runs on while he gets there */
+  let simEnd = s.tFreeze + (d0/RUN_V + 2*RUN_V/RUN_A)*1000 + 2500;
+  for (let pass = 0; pass < 2; pass++){
+    s._tEnd = simEnd; s.T = simulate(s);
+    /* his run, a step at a time: toward the spot, round anyone in the way (he does not run
+       through people), up to speed and easing into the spot */
+    const DTR = 50, tr = [[s.tFreeze, me[0], me[1]]];
+    let p = me.slice(), v = 0, t = s.tFreeze, arrived = null, stuck = 0;
+    const tMax = (d0/RUN_V + RUN_V/RUN_A)*1000 + 2500;           // never longer than a detour could take
+    while (t < simEnd - DTR){
+      t += DTR;
+      const dx = to[0] - p[0], dz = to[1] - p[1], dist = Math.hypot(dx, dz);
+      if (dist < 0.05 || (dist < 4 && stuck > 5) || t > s.tFreeze + tMax){ arrived = arrived || t; tr.push([t, p[0], p[1]]); if (t > arrived + RUN_HOLD) break; continue; }
+      let hx = dx/dist, hz = dz/dist;
+      if (dist > 1.2){
+        const fx = hx, fz = hz;                                  // straight at the spot
+        for (const id in s.T.tr){
+          const q = at100(s.T.tr[id], t), rx = s.side*q[0] - p[0], rz = q[1] - p[1], rd = Math.hypot(rx, rz);
+          if (rd > 4 || rd < 1e-3 || rd > dist + 1) continue;
+          const ahead = (rx*fx + rz*fz)/rd;                      // how much he is in the way
+          if (ahead > 0.2){
+            const cross = fx*rz - fz*rx;                         // which side of my line he is on
+            const nx = cross > 0 ? fz : -fz, nz = cross > 0 ? -fx : fx;   // the perpendicular away from him
+            const k = (4 - rd)/4*1.6*ahead; hx += nx*k; hz += nz*k;
+          }
+        }
+      }
+      for (const id in s.T.tr){                                  // and never into anyone, even at the spot
+        const q = at100(s.T.tr[id], t), rx = s.side*q[0] - p[0], rz = q[1] - p[1], rd = Math.hypot(rx, rz);
+        if (rd < 1.4 && rd > 1e-3){ const k = (1.4 - rd)/1.4*3; hx -= rx/rd*k; hz -= rz/rd*k; }
+      }
+      const hl = Math.hypot(hx, hz) || 1; hx /= hl; hz /= hl;
+      const want = Math.min(RUN_V, Math.sqrt(2*RUN_A*dist));
+      v = want > v ? Math.min(want, v + RUN_A*DTR/1000) : want;
+      const st = Math.min(dist, v*DTR/1000);
+      const np = [p[0] + hx*st, p[1] + hz*st];
+      stuck = Math.hypot(np[0] - to[0], np[1] - to[1]) > dist - 0.05 ? stuck + 1 : 0;   // a man is standing on the spot: he stops next to him
+      p = np; tr.push([t, p[0], p[1]]);
+    }
+    if (arrived && t > arrived + RUN_HOLD - 1 || pass === 1){
+      const r = { from: me, to, d: d0, tr, t0: s.tFreeze, ms: (arrived || t) - s.tFreeze, tEnd: Math.min(t, simEnd - 100) };
+      s._yaw = bodyYaws(s);
+      s.run = r; return r;
+    }
+    simEnd += 6000;
+  }
+}
+/* where a passer is in his pass at T: k from -1 (900 ms out: eyes on the ball, then the glance)
+   through 0 (the plant, 300 ms out), 0.7 (contact, at the strike) to 1.2 (settled, 500 ms after) */
+const footOf = id => { let h = 0; for (const c of id) h = (h*31 + c.charCodeAt(0)) % 97; return h % 4 === 0 ? 'L' : 'R'; };
+function passPhase(s, id, T){
+  for (let i = 1; i < s.ev.length; i++){
+    if (s.ev[i-1].role !== id) continue;
+    const u = T - s.ev[i].ts;
+    if (u < -900 || u > 500) continue;
+    const k = u <= -300 ? -1 + (u + 900)/600 : u <= 0 ? (u + 300)/300*0.7 : 0.7 + u/500*0.5;
+    const r = ((s.ev[i].ts*7919) % 100)/100;                 // disguise: about one pass in four, fixed per pass
+    const dis = r < 0.25, feint = r < 0.12 ? (r < 0.06 ? 1 : -1) : 0;
+    return { k, o: { foot: footOf(id), power: Math.min(1, s.ev[i].len/26), open: s.ev[i].len > 22 ? 0.35 : 0.7, look: dis ? 0 : 1, feint } };
+  }
+  return { k: null };
+}
+function seqFrame(s, T){
+  const wx = p => [s.side*p[0], p[1]];
+  let meTL = null;
+  if (s.tl && T > s.tFreeze){ meTL = tlAt(s, T); T = meTL.W; }
+  const bt = trackAt(s.T.ball, T), B = wx(bt.p);
+  ballMesh.position.set(B[0], 0.115, B[1]);
+  ballMesh.quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -bt.dist/0.115);
+  Object.keys(ACT).forEach(id => {
+    const o = ACT[id], t = trackAt(s.T.tr[id], T), p = wx(t.p), sp = Math.hypot(t.v[0], t.v[1]);
+    o.mesh.position.set(p[0], 0, p[1]); o.ex = p[0]; o.ez = p[1];
+    const pg = o.mesh.userData.poseGait;
+    /* the body turns at a human rate toward where he is looking to play (worked out per clip);
+       the legs do what the feet are doing: run, walk, stand, or step back */
+    const ya = s._yaw ? yawAt(s, id, T) : (passFacing(s, id, T) || { a: freeYaw(s, id, T) }).a;
+    if (o.mesh.userData.pass){ const pp = passPhase(s, id, T); o.mesh.userData.pass(pp.k, pp.o); }
+    o.mesh.rotation.y = Math.atan2(s.side*Math.sin(ya), Math.cos(ya));
+    if (sp > 0.6){
+      const back = (Math.sin(ya)*t.v[0] + Math.cos(ya)*t.v[1]) / sp < -0.3;       // moving against the way he faces
+      const name = sp > 2.3 && !back ? 'run' : 'walk', ph = t.dist/(name === 'run' ? 3.47 : 1.67);
+      if (pg) pg(name, back ? -ph : ph); else o.pose(t.dist/3.47);
+    } else { if (pg) pg('idle', T/1000); else o.pose(-0.05 - T/1000); }
+  });
+  const hid = holderAt(s, T);
+  if (carrierRing){ carrierRing.visible = !!hid; if (hid){ const q = wx(trackAt(s.T.tr[hid], T).p); carrierRing.position.set(q[0], 0.03, q[1]); } }
+  /* his eyes: he stands still and keeps the ball in the middle of his picture,
+     with the little lag a head has, so the play reads */
+  let me = wx(s.start), runK = 0, bob = 0;
+  if (meTL){
+    me = meTL.p; runK = 1;                                   // after the freeze: square to the ball
+    bob = Math.sin(meTL.dist/1.7*Math.PI)*0.035*Math.min(1, meTL.v/4);   // a little bounce in the stride, with his speed
+  }
+  const lag = wx(trackAt(s.T.ball, Math.max(0, T - 220)).p);
+  const home = ypTo(me[0], me[1], me[0] - s.side*14, 1.4, me[1] - 22);
+  const onBall = ypTo(me[0], me[1], lag[0], 0.6, lag[1]); onBall[1] = Math.max(onBall[1], -0.3);
+  const yp = mixYP(home, onBall, 0.88 + 0.12*runK);         // running: square to the ball
+  const sc = scanNow();
+  if (sc){ yp[0] += sc.dir*Math.PI/2*sc.k; yp[1] = yp[1] + (-0.06 - yp[1])*sc.k; }      // left is +yaw
+  camYP(me[0], me[1], yp[0], yp[1]);
+  if (bob) camera.position.y += bob;
+}
+function runSequence(done, from){
+  const t0 = performance.now() - (from || 0), end = seqTimes().end, gen = ++seqGen;
+  seqLive = true; scan = null;
+  (function step(now){
+    if (gen !== seqGen) return;
+    const T = Math.min(end, now - t0);
+    seqFrame(current, T);
+    if (T < end){ requestAnimationFrame(step); return; }
+    seqLive = false;
+    done();                                   // frozen: the last pass has just been struck
+  })(t0);
+}
+/* Scanning. A tap on the left or right half of the picture while the play runs
+   turns his head 90 degrees that way: 0.11 s out, 0.13 s at the end of the turn,
+   0.11 s back onto the ball: about a third of a second, like a pro's scan. One scan at a time. */
+let seqLive = false, scan = null;
+const SCAN_OUT = 110, SCAN_HOLD = 130, SCAN_BACK = 110;      // a pro's scan: about 0.35 s, barely a pause
+function scanNow(){
+  if (!scan) return null;
+  const t = performance.now() - scan.t0, E = q => q < 0.5 ? 2*q*q : 1 - Math.pow(-2*q + 2, 2)/2;
+  if (t >= SCAN_OUT + SCAN_HOLD + SCAN_BACK){ scan = null; return null; }
+  const k = t < SCAN_OUT ? E(t/SCAN_OUT) : t < SCAN_OUT + SCAN_HOLD ? 1 : E(1 - (t - SCAN_OUT - SCAN_HOLD)/SCAN_BACK);
+  return { dir: scan.dir, k };
+}
+function startScan(dir){
+  if (!seqLive || scan) return false;
+  scan = { dir, t0: performance.now() };
+  return true;
+}
+stage.addEventListener('pointerdown', e => {
+  const r = stage.getBoundingClientRect();
+  startScan(e.clientX < r.left + r.width/2 ? 1 : -1);
+});
+/* on a computer: the arrow keys */
+addEventListener('keydown', e => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  if (seqLive) e.preventDefault();
+  if (!e.repeat) startScan(e.key === 'ArrowLeft' ? 1 : -1);
+});
+let seqGen = 0;
+
+let camAim = null;                      // [bearing, height] while not on the usual look
+function ballBearing(s){ return lookBearing(); }     // the ball is at his feet, dead ahead
+function lookBearing(){ return Math.atan2(CFG.look.oz, CFG.look.ox) * 180/Math.PI; }
+function aimAt(s, bearingDeg, y){
+  reviewing = false; camAim = [bearingDeg, y];
+  const px = s.side*(s.wingX || CFG.wingX), pz = s.zBase, b = bearingDeg*Math.PI/180;
+  camera.position.set(px, CFG.eyeHeight, pz);
+  setFov();
+  camera.lookAt(px + s.side*26*Math.cos(b), y, pz + 26*Math.sin(b));
+}
+function aimCamera(s){
+  reviewing = false; camAim = null; seqCam = null;
+  const px = s.side*(s.wingX || CFG.wingX), pz = s.zBase;
+  camera.position.set(px, CFG.eyeHeight, pz);
+  setFov();
+  camera.lookAt(px + s.side*CFG.look.ox, 1.5, pz + CFG.look.oz);
+}
+
+function resize(){
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w,h,false);
+  camera.aspect = w/Math.max(h,1);
+  setFov();
+  const mc = document.getElementById('mask'); mc.width = w; mc.height = h;
+  if (current){
+    if (reviewing) aimReview(current);
+    else if (seqCam) camYP(seqCam[0], seqCam[1], seqCam[2], seqCam[3]);
+    else if (camAim) aimAt(current, camAim[0], camAim[1]);
+    else aimCamera(current);
+  }
+}
+addEventListener('resize', resize);
+function loop(){ renderer.render(scene,camera); requestAnimationFrame(loop); }
+
+function drawMask(){
+  const c = document.getElementById('mask'), g = c.getContext('2d');
+  const cw = 96, ch = Math.max(1, Math.round(96*c.height/Math.max(c.width,1)));
+  const off = document.createElement('canvas'); off.width = cw; off.height = ch;
+  const og = off.getContext('2d'), img = og.createImageData(cw,ch);
+  for (let i = 0; i < img.data.length; i += 4){
+    const v = Math.random();
+    img.data[i] = 30+v*110; img.data[i+1] = 70+v*140; img.data[i+2] = 40+v*100; img.data[i+3] = 255;
+  }
+  og.putImageData(img,0,0);
+  g.imageSmoothingEnabled = false;
+  g.drawImage(off,0,0,c.width,c.height);
+}
+
+/* ---------------- the shape map ----------------
+   The whole pitch from above, turned on its side to fill a phone held sideways:
+   attacking to the right, so the right wing runs along the bottom edge.
+   Before he taps: the lines, the lanes and where he was standing. After:
+   everyone at the moment it froze, the pass that was struck, where he should
+   be, and his tap. */
+const NS = 'http://www.w3.org/2000/svg';
+const LANES = [-20.16, -9.16, 9.16, 20.16];
+function svgEl(tag, at, parent){
+  const e = document.createElementNS(NS, tag);
+  for (const k in at) e.setAttribute(k, at[k]);
+  (parent || document.getElementById('map')).appendChild(e); return e;
+}
+function drawMap(s, reveal, tap){
+  const svg = document.getElementById('map');
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', '-56 -37.5 112 75');
+  svgEl('rect', { x: -100, y: -100, width: 200, height: 200, fill: '#16301d' });
+  const g = svgEl('g', { id: 'world', transform: 'matrix(0 1 -1 0 0 0)' });      // pitch x down the screen, attack to the right
+  const L = (tag, at) => svgEl(tag, at, g);
+  const W = s.side, P = p => [W*p[0], p[1]];
+  L('rect', { x: -34, y: -52.5, width: 68, height: 105, class: 'pitch' });
+  /* his lane, lightly lit; on the reveal, the lane his spot is in */
+  L('rect', { x: W === 1 ? 20.16 : -34, y: -52.5, width: 13.84, height: 105, fill: '#5aa9ff', opacity: .08 });
+  /* the boxes: lanes across, and the bands the defending team's lines make */
+  const bands = bandsOf(s);                            // the boxes are always on the map
+  const edges = [34, 20.16, 9.16, -9.16, -20.16, -34];
+  const box = (p, fill, op) => {                       // tint the box a point (right-wing metres) is in
+    const li = laneOf(p[0]), xa = W*edges[li], xb = W*edges[li+1];
+    let z0 = -52.5, z1 = 52.5;
+    if (bands){ const bi = bandOf(p[1], bands); z0 = bi === 0 ? -52.5 : bands.cuts[bi-1]; z1 = bi === bands.cuts.length ? 52.5 : bands.cuts[bi]; }
+    L('rect', { x: Math.min(xa, xb), y: z0, width: Math.abs(xa - xb), height: z1 - z0, fill, opacity: op });
+    return [W*(edges[li] + edges[li+1])/2, (z0 + z1)/2];
+  };
+  if (reveal){
+    box(s.ideal, '#c6ef2f', .16);
+    /* a team-mate already on that lane and line */
+    const fin = matePos(s), taken = [];
+    if (tap){ const mine = [W*tap[0], tap[1]]; boxMates(s, mine).forEach(id => taken.push(id)); }
+    if (s.kind === 'attSwap'){ ['RB', 'R8'].forEach(id => { if (!taken.includes(id)) taken.push(id); }); }
+    taken.forEach(id => { const q = P(fin[id]);
+      L('circle', { cx: q[0], cy: q[1], r: 2.6, fill: 'none', stroke: '#ff8a70', 'stroke-width': .45 });
+      const e = svgEl('text', { x: -q[1], y: q[0] + (q[0] > 0 ? -6.4 : 7.2), 'font-size': 1.9, 'text-anchor': 'middle', fill: '#ffc2b5' });
+      e.textContent = s.kind === 'attSwap' && (id === 'RB' || id === 'R8') ? (id === 'RB' ? 'YOUR FULL-BACK' : 'YOUR 8, COVERING') : 'SAME LANE, SAME LINE'; });
+  }
+  LANES.forEach(x => L('line', { x1: x, y1: -52.5, x2: x, y2: 52.5, stroke: '#fff', 'stroke-width': .22, 'stroke-dasharray': '1.4 1.2', opacity: .4 }));
+  if (bands) bands.cuts.forEach(z => L('line', { x1: -34, y1: z, x2: 34, y2: z, stroke: '#ffe066', 'stroke-width': .26, 'stroke-dasharray': '.8 1', opacity: .7 }));
+  L('rect', { x: -34, y: -52.5, width: 68, height: 105, class: 'ln' });
+  L('line', { x1: -34, y1: 0, x2: 34, y2: 0, class: 'ln' });
+  L('circle', { cx: 0, cy: 0, r: 9.15, class: 'ln' });
+  [[-52.5, 1], [52.5, -1]].forEach(([gz, d]) => {
+    L('rect', { x: -20.15, y: d === 1 ? gz : gz - 16.5, width: 40.3, height: 16.5, class: 'ln' });
+    L('rect', { x: -9.16, y: d === 1 ? gz : gz - 5.5, width: 18.32, height: 5.5, class: 'ln' });
+    L('rect', { x: -3.66, y: d === 1 ? gz - 2 : gz, width: 7.32, height: 2, fill: 'none', stroke: '#fff', 'stroke-width': .45 });
+    /* the D: the arc of the penalty spot outside the 18-yard box */
+    const ez = gz + d*16.5, hx = Math.sqrt(9.15*9.15 - 5.5*5.5);
+    L('path', { d: 'M ' + (-hx) + ' ' + ez + ' A 9.15 9.15 0 0 ' + (d === 1 ? 0 : 1) + ' ' + hx + ' ' + ez, class: 'ln' });
+    L('circle', { cx: 0, cy: gz + d*11, r: .35, fill: '#dfe8e0' });
+  });
+  /* labels stay upright: placed in screen space at the pitch point (x, z) */
+  const txt = (x, z, t, size, opa, dy, fill) => { const e = svgEl('text', { x: -z, y: x + (dy || 0), 'font-size': size, 'text-anchor': 'middle', opacity: opa || 1, fill: fill || '#fff' }); e.textContent = t; return e; };
+  const at = svgEl('text', { x: 44, y: 36.6, 'font-size': 2.3, 'text-anchor': 'middle', opacity: .7 }); at.textContent = 'ATTACKING \u25B6';
+  /* the lines named, above the pitch */
+  if (bands){ const zs = [-52.5].concat(bands.cuts, [52.5]);
+    bands.names.forEach((n, i) => { const zc = (zs[i] + zs[i+1])/2, e = svgEl('text', { x: -zc, y: -35.2, 'font-size': 1.9, 'text-anchor': 'middle', opacity: .55 }); e.textContent = n; }); }
+  /* the lanes named, at our end */
+  [[27.1, 'WIDE'], [14.66, 'HALF-SPACE'], [0, 'MIDDLE'], [-14.66, 'HALF-SPACE'], [-27.1, 'WIDE']].forEach(([x, n]) => txt(x, 47, n, 1.7, .4, 0.6));
+  const st = P(s.start);
+  L('circle', { cx: st[0], cy: st[1], r: 1.3, fill: 'none', stroke: '#5aa9ff', 'stroke-width': .5, 'stroke-dasharray': '.7 .5' });
+  txt(st[0], st[1], 'YOU WERE HERE', 2.1, .85, W === 1 ? -2.4 : 3.6);
+  const T = s.tFreeze, last = s.ev[s.ev.length - 1], from = P(trackAt(s.T.ball, T).p), to = P(last.at), fin = last.sh;
+  const showPlayers = reveal || learning();
+  if (showPlayers){
+    /* everyone where they were when it froze (on the reveal, with where they were heading) */
+    Object.keys(s.T.tr).forEach(id => {
+      const p = P(trackAt(s.T.tr[id], T).p), own = !!s.ev[0].sh.own[id], col = GK_CSS[id] ? GK_CSS[id] : own ? '#5aa9ff' : '#ff5a3c';
+      const gp = own ? fin.own[id] : fin.opp[id];
+      if (reveal && gp && id !== last.role && !(s.turn && own)){ const goal = P(gp);     // pressing men are not heading for a shape
+        if (Math.hypot(goal[0]-p[0], goal[1]-p[1]) > 2.5)
+          L('line', { x1: p[0], y1: p[1], x2: goal[0], y2: goal[1], stroke: col, 'stroke-width': .3, opacity: .45, 'stroke-dasharray': '.6 .5' }); }
+      L('circle', { cx: p[0], cy: p[1], r: 1.0, fill: col, stroke: own ? '#fff' : '#200', 'stroke-width': .2 });
+    });
+    /* the pass that was struck */
+    L('line', { x1: from[0], y1: from[1], x2: to[0], y2: to[1], stroke: '#fff', 'stroke-width': .4, 'stroke-dasharray': '1.2 .8' });
+    const dx = to[0]-from[0], dz = to[1]-from[1], dl = Math.hypot(dx, dz) || 1, ux = dx/dl, uz = dz/dl;
+    L('path', { d: 'M ' + (to[0]) + ' ' + (to[1]) + ' L ' + (to[0] - ux*2 - uz*1) + ' ' + (to[1] - uz*2 + ux*1) + ' L ' + (to[0] - ux*2 + uz*1) + ' ' + (to[1] - uz*2 - ux*1) + ' Z', fill: '#fff' });
+    L('circle', { cx: from[0], cy: from[1], r: .65, fill: '#fff' });
+  }
+  if (!reveal) return;
+  /* the reference that tells him where to be */
+  const ref = s.ref;
+  if (ref.type === 'line'){
+    const col = ref.team === 'opp' ? '#ff8a70' : ref.team === 'own' ? '#8cc4ff' : '#ffffff';
+    L('line', { x1: -34, y1: ref.z, x2: 34, y2: ref.z, stroke: col, 'stroke-width': .35, 'stroke-dasharray': '2 1', opacity: .9 });
+    txt(W === 1 ? -31 : 31, ref.z, (ref.text || ref.label).toUpperCase(), 1.9, .95, 0, col);
+  } else {
+    const k = s.T.tr[ref.id], p = P(trackAt(k, T).p), endp = s.turn ? p : P(fin.opp[ref.id] || p);
+    const m = ref.id === s.extra.role ? to : endp;
+    L('circle', { cx: m[0], cy: m[1], r: 2.4, fill: 'none', stroke: '#ff8a70', 'stroke-width': .4 });
+    txt(m[0], m[1], ref.label.toUpperCase(), 1.9, .95, W === 1 ? 4.6 : -3.6, '#ff8a70');
+  }
+  /* where he should be */
+  const f = P(s.ideal);
+  L('line', { x1: st[0], y1: st[1], x2: f[0], y2: f[1], stroke: '#c6ef2f', 'stroke-width': .3, opacity: .55, 'stroke-dasharray': '1 .8' });
+  /* the circles stop at the offside line: no part of a right spot is offside */
+  const clip = {};
+  if (s.offLine !== undefined){
+    const cp = L('clipPath', { id: 'onside' }); svgEl('rect', { x: -40, y: s.offLine, width: 80, height: 60 - s.offLine }, cp);
+    clip['clip-path'] = 'url(#onside)';
+    if (!(ref.type === 'line' && ref.label === 'their last defender') && s.ideal[1] - NEAR < s.offLine){
+      L('line', { x1: -34, y1: s.offLine, x2: 34, y2: s.offLine, stroke: '#ff8a70', 'stroke-width': .3, 'stroke-dasharray': '1.2 1', opacity: .7 });
+      txt(W === 1 ? 31 : -31, s.offLine, 'OFFSIDE LINE', 1.7, .8, 0, '#ff8a70'); }
+  }
+  L('circle', Object.assign({ cx: f[0], cy: f[1], r: NEAR, fill: 'none', stroke: '#e7b93a', 'stroke-width': .25, 'stroke-dasharray': '.8 .6', opacity: .7 }, clip));
+  L('circle', Object.assign({ cx: f[0], cy: f[1], r: HIT, fill: 'rgba(198,239,47,.14)', stroke: '#c6ef2f', 'stroke-width': .45 }, clip));
+  txt(f[0], f[1], 'HERE', 2.2, .95, -HIT - 0.8);
+  if (tap){
+    [[-1,-1,1,1],[-1,1,1,-1]].forEach(([a,b,c,d]) => L('line', { x1: tap[0]+a*1.2, y1: tap[1]+b*1.2, x2: tap[0]+c*1.2, y2: tap[1]+d*1.2, stroke: '#fff', 'stroke-width': .5 }));
+  }
+}
+function mapPoint(evt){
+  const svg = document.getElementById('map'), g = document.getElementById('world'), pt = svg.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  const p = pt.matrixTransform(g.getScreenCTM().inverse());
+  return [p.x, p.y];
+}
+let mapOpen = false;
+/* ---------------- picking the spot on the pitch ----------------
+   The play is paused on the frozen picture, seen from his eyes. He can look around
+   (drag or swipe the picture, or the arrow keys) and taps the grass where he is going. */
+let aim = null, aimMarker = null, hoverMarker = null;
+function startAim(){
+  const c = seqCam || [0, 0, 0, 0];
+  aim = { px: c[0], pz: c[1], yaw: c[2], pitch: c[3], down: null };
+}
+function aimLook(){
+  if (!aim) return;
+  aim.pitch = clamp(aim.pitch, -1.3, 0.25);
+  camYP(aim.px, aim.pz, aim.yaw, aim.pitch);
+}
+/* the point on the grass under the finger (null if it is the sky) */
+function groundAt(clientX, clientY){
+  const r = renderer.domElement.getBoundingClientRect();
+  const v = new THREE.Vector3(((clientX - r.left)/r.width)*2 - 1, -((clientY - r.top)/r.height)*2 + 1, 0.5).unproject(camera);
+  const o = camera.position.clone(), d = v.sub(o).normalize();
+  if (d.y > -0.004) return null;
+  const k = -o.y/d.y;
+  return [clamp(o.x + d.x*k, -33.5, 33.5), clamp(o.z + d.z*k, -52, 52)];
+}
+function ringAt(p, color, opacity){
+  const m = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.85, 40),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide }));
+  m.rotation.x = -Math.PI/2; m.position.set(p[0], 0.04, p[1]); actors.add(m); return m;
+}
+function clearHover(){ if (hoverMarker){ actors.remove(hoverMarker); hoverMarker = null; } }
+stage.addEventListener('pointerdown', e => {
+  if (!mapOpen || !aim) return;
+  e.preventDefault();
+  aim.down = { x: e.clientX, y: e.clientY, yaw: aim.yaw, pitch: aim.pitch, moved: false };
+  try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+});
+stage.addEventListener('pointermove', e => {
+  if (!mapOpen || !aim) return;
+  if (!aim.down){                                    // a mouse: show where a click would land
+    if (e.pointerType !== 'mouse') return;
+    const p = groundAt(e.clientX, e.clientY);
+    if (!p){ clearHover(); return; }
+    if (!hoverMarker) hoverMarker = ringAt(p, 0xffffff, 0.55); else hoverMarker.position.set(p[0], 0.04, p[1]);
+    return;
+  }
+  const dx = e.clientX - aim.down.x, dy = e.clientY - aim.down.y;
+  if (!aim.down.moved && Math.hypot(dx, dy) > 8) aim.down.moved = true;
+  if (!aim.down.moved) return;
+  const k = (camera.fov*Math.PI/180)/Math.max(1, stage.clientHeight);   // the picture follows the finger
+  aim.yaw = aim.down.yaw + dx*k; aim.pitch = aim.down.pitch + dy*k;
+  clearHover(); aimLook();
+});
+stage.addEventListener('pointerup', e => {
+  if (!mapOpen || !aim || !aim.down) return;
+  const tapped = !aim.down.moved; aim.down = null;
+  if (!tapped) return;
+  const p = groundAt(e.clientX, e.clientY);
+  if (!p) return;                                       // tapped the sky: nothing
+  clearHover();
+  aimMarker = ringAt(p, 0xc6ef2f, 0.9);
+  answerMap(p);
+});
+stage.addEventListener('pointercancel', () => { if (aim) aim.down = null; });
+/* the arrow keys: hold to turn. The head speeds up smoothly when a key goes down and
+   eases to a stop when it comes up, so nothing jerks; a quick tap is a small nudge. */
+const KEYTURN = { yawMax: 5.236, pitchMax: 0.9, accel: 19.4, decel: 26.2 };   // rad/s (300 deg/s turning), rad/s per second
+const keysHeld = new Set();
+let keyVel = [0, 0], keyLoop = 0, keyLast = 0;
+function keyStep(now){
+  keyLoop = 0;
+  const dt = Math.min(0.05, (now - keyLast)/1000); keyLast = now;
+  if (!mapOpen || !aim){ keysHeld.clear(); keyVel = [0, 0]; return; }
+  const want = [(keysHeld.has('ArrowLeft') ? 1 : 0) - (keysHeld.has('ArrowRight') ? 1 : 0),
+                (keysHeld.has('ArrowUp') ? 1 : 0) - (keysHeld.has('ArrowDown') ? 1 : 0)];
+  const max = [KEYTURN.yawMax, KEYTURN.pitchMax];
+  for (let i = 0; i < 2; i++){
+    const target = want[i]*max[i], v = keyVel[i];
+    const rate = (target !== 0 && Math.sign(target) === Math.sign(v || target) && Math.abs(target) > Math.abs(v)) ? KEYTURN.accel*max[i]/KEYTURN.yawMax : KEYTURN.decel*max[i]/KEYTURN.yawMax;
+    keyVel[i] = target > v ? Math.min(target, v + rate*dt) : Math.max(target, v - rate*dt);
+  }
+  if (keyVel[0] || keyVel[1]){ aim.yaw += keyVel[0]*dt; aim.pitch += keyVel[1]*dt; clearHover(); aimLook(); }
+  if (keysHeld.size || keyVel[0] || keyVel[1]) keyLoop = requestAnimationFrame(keyStep);
+}
+addEventListener('keydown', e => {
+  if (!mapOpen || !aim) return;
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+  e.preventDefault();
+  if (!keysHeld.has(e.key)) keyDownAt[e.key] = performance.now();
+  keysHeld.add(e.key);
+  if (!keyLoop){ keyLast = performance.now(); keyLoop = requestAnimationFrame(keyStep); }
+});
+const keyDownAt = {};
+addEventListener('keyup', e => {                     // a quick tap still turns him a few degrees
+  const held = performance.now() - (keyDownAt[e.key] || 0), k = e.key;
+  if (held < 130) setTimeout(() => keysHeld.delete(k), 130 - held); else keysHeld.delete(k);
+});
+addEventListener('blur', () => keysHeld.clear());
+document.getElementById('map').addEventListener('pointerdown', e => {
+  if (!mapOpen) return;
+  e.preventDefault();
+  answerMap(mapPoint(e));
+});
+
+/* ---------------- flow ---------------- */
+const el = id => document.getElementById(id);
+const veil = el('veil'), maskEl = el('mask'), labels = el('labels'), timer = el('timer');
+const pIdle = el('panelIdle'), pAsk = el('panelAsk'), pFeed = el('panelFeedback'), pSum = el('panelSummary');
+
+let rep = 0, current = null, ranked = null, answerTimer = null, sPts = 0, sMax = 0;
+let bag = [], sBest = 0;
+let lastSide = Math.random() < 0.5 ? 1 : -1;
+
+function show(p){ [pIdle,pAsk,pFeed,pSum].forEach(x => x.classList.add('hide')); p.classList.remove('hide'); }
+function setVeil(on,big,sub){
+  veil.classList.toggle('on',on);
+  if (big !== undefined) el('veilBig').textContent = big;
+  if (sub !== undefined) el('veilSub').textContent = sub;
+}
+function paintSides(){
+  ['L','R'].forEach(k => {
+    const s = stats[k], pct = s.max ? Math.round(100*s.pts/s.max) : null;
+    el('pct'+k).textContent = pct === null ? '—' : pct+'%';
+    el('fill'+k).style.width = (pct === null ? 0 : pct)+'%';
+  });
+  const l = stats.L.max ? stats.L.pts/stats.L.max : null;
+  const r = stats.R.max ? stats.R.pts/stats.R.max : null;
+  el('sideL').classList.toggle('weak', l !== null && r !== null && l < r - 0.08);
+  el('sideR').classList.toggle('weak', l !== null && r !== null && r < l - 0.08);
+}
+
+function startSession(){ rep = 0; sPts = 0; sMax = 0; sBest = 0; bag = newBag(); nextRep(); }
+
+let prefetched = null;
+function nextSideGuess(){ return stats.side === 'alt' ? -lastSide : (stats.side === 'R' ? 1 : -1); }
+function prefetchNext(){
+  if (prefetched || !bag.length || rep >= CFG.repsPerSession) return;
+  const key = bag[bag.length - 1], side = nextSideGuess();
+  prefetched = { key, side, s: makeScene(side, key) };
+}
+function nextRep(){
+  if (fixPending){ runFix(); return; }
+  replaying = false;
+  seqGen++; const rb = el('replay'); if (rb){ rb.disabled = false; rb.textContent = 'Replay the clip and your run'; }
+  if (rep >= CFG.repsPerSession) return endSession();
+  rep++;
+  lastSide = stats.side === 'alt' ? -lastSide : (stats.side === 'R' ? 1 : -1);
+  el('hmeta').textContent = 'Rep '+rep+' / '+CFG.repsPerSession+
+    ' · '+(lastSide === 1 ? 'Right' : 'Left');
+  if (!bag.length) bag = newBag();
+  { const k = bag.pop(); current = (prefetched && prefetched.key === k && prefetched.side === lastSide) ? prefetched.s : makeScene(lastSide, k); prefetched = null; }
+  ranked = scoreScene(current);
+  buildScene(current);
+  clearPath();
+  seqFrame(current, 0);
+  labels.style.display = 'none'; labels.innerHTML = '';
+  el('leaders').style.display = 'none';
+  maskEl.style.display = 'none'; timer.style.display = 'none';
+  show(pAsk);
+  el('askWord').firstChild.textContent = 'Watch';
+  el('askHint').textContent = matchMedia('(hover: hover) and (pointer: fine)').matches ? 'Press ← or → to scan over that shoulder.' : 'Tap left or right to scan over that shoulder.';
+  el('answers').innerHTML = '';
+  setVeil(true, (current.side === 1 ? 'Right wing' : 'Left wing') + (learning() ? ' · Learn' : ' · Test'), 'Who has it, and where is it? When it freezes: your lane, and your line.');
+  setTimeout(flash, CFG.cueMs);
+}
+
+function flash(){
+  setVeil(false);
+  runSequence(() => setTimeout(ask, 450));
+}
+
+
+
+/* Watch the same rep again from his eyes, now that he knows what the
+   explanations are talking about. Nothing is re-scored and the rep does not
+   advance \u2014 it is the identical scene, played back. */
+let replaying = false;
+function replayLook(){
+  if (replaying || !current) return;
+  replaying = true;
+  const btn = el('replay'); btn.disabled = true; btn.textContent = 'Watching…';
+  show(pAsk); el('askWord').firstChild.textContent = 'Watch'; el('askHint').textContent = current.tl ? 'The play, then your run.' : 'The play again.'; el('answers').innerHTML = '';
+  document.getElementById('mapwrap').style.display = 'none';
+  runSequence(() => setTimeout(() => {
+    if (!replaying) return;
+    document.getElementById('mapwrap').style.display = 'flex';
+    show(pFeed);
+    replaying = false;
+    btn.disabled = false; btn.textContent = 'Replay the clip and your run';
+  }, 450));
+}
+
+function ask(){
+  maskEl.style.display = 'none';
+  el('askWord').firstChild.textContent = 'Where should you be?';
+  el('askHint').textContent = learning() ? 'Who has it? Which side? Then: your lane, and your line.' : 'Tap your spot.';
+  el('answers').innerHTML = '';
+  document.getElementById('radar').style.display = 'none';
+  document.getElementById('mapwrap').style.display = 'none';
+  el('askHint').textContent += matchMedia('(hover: hover) and (pointer: fine)').matches
+    ? ' Click the grass where you are going. Drag or use the arrow keys to look around.'
+    : ' Tap the grass where you are going. Swipe to look around.';
+  startAim();
+  mapOpen = true;
+  timer.style.display = 'block';
+  timer.style.transition = 'none'; timer.style.width = '100%';
+  requestAnimationFrame(() => { timer.style.transition = 'width '+CFG.answerMs+'ms linear'; timer.style.width = '0%'; });
+  answerTimer = setTimeout(() => answerMap(null), CFG.answerMs);
+}
+
+/* what was off, in the theory's terms: the lane, then the line (or the man) */
+function diagnose(c, mine){
+  const li = laneOf(c.ideal[0]), lt = laneOf(mine[0]);
+  const d = Math.hypot(mine[0]-c.ideal[0], mine[1]-c.ideal[1]);
+  const lane = lt === li ? 'Right lane' : 'Wrong lane: you picked ' + LANE_NAME[lt] + ', your spot is in ' + LANE_NAME[li];
+  if (c.offLine !== undefined && mine[1] < c.offLine - OFF_TOL) return 'Offside: ' + (c.offLine - mine[1]).toFixed(0) + ' m beyond their last defender. ' + lane + '. Level with him is onside &mdash; never past him.';
+  if (d <= HIT) return lt === li ? 'Right lane, right line.' : 'Right spot, just over the lane line &mdash; keep it in ' + LANE_NAME[li] + '.';
+  let line = '';
+  if (c.ref.type === 'man'){
+    line = 'you were ' + d.toFixed(0) + ' m from ' + c.ref.label + ' &mdash; get to him, ' + c.ref.how;
+  } else {
+    const dz = mine[1] - c.ideal[1];                  // + is deeper (toward our goal)
+    if (dz > 3) line = dz.toFixed(0) + ' m too deep &mdash; get level with ' + c.ref.label;
+    else if (dz < -3) line = c.kind.startsWith('att') ? (-dz).toFixed(0) + ' m beyond their last defender &mdash; offside'
+                                                     : (-dz).toFixed(0) + ' m too high &mdash; get level with ' + c.ref.label;
+    else line = 'right line';
+  }
+  return lane + ', ' + line + '.';
+}
+function answerMap(tap){
+  if (!mapOpen) return;
+  mapOpen = false;
+  aim = null; clearHover();
+  clearTimeout(answerTimer);
+  timer.style.display = 'none';
+  const c = current, mine = tap ? [c.side*tap[0], tap[1]] : null;     // into right-wing metres
+  const d = mine ? Math.hypot(mine[0]-c.ideal[0], mine[1]-c.ideal[1]) : null;
+  const offside = !!mine && c.offLine !== undefined && mine[1] < c.offLine - OFF_TOL;   // level is onside
+  const pts = d === null || offside ? 0 : d <= HIT ? 3 : d <= NEAR ? 1 : 0;
+  sPts += pts; sMax += 3;
+  const k = c.side === 1 ? 'R' : 'L';
+  stats[k].pts += pts; stats[k].max += 3;
+  if (pts === 3) sBest++;
+  paintSides(); saveStats();
+  const box = el('rank'); box.innerHTML = '';
+  const row = (chip, cls, text) => { const r = document.createElement('div'); r.className = 'row picked';
+    r.innerHTML = '<span class="chip ' + cls + '">' + chip + '</span><span class="wy">' + text + '</span>'; box.appendChild(r); };
+  const stayed = mine && Math.hypot(mine[0]-c.start[0], mine[1]-c.start[1]) < 4 && pts < 3;
+  if (d === null) row('Too slow', 't0', 'Pick your spot while the ball is still travelling &mdash; by the time it arrives you should already be moving.');
+  else { const mates = pts < 3 ? boxMates(c, mine) : [];
+    row(TIER_NAME[pts], 't' + pts, diagnose(c, mine) + (stayed ? ' You stayed where you were &mdash; the play moved and you did not.' : '') +
+      (mates.length ? ' ' + ROLE_NAME[mates[0]][0].toUpperCase() + ROLE_NAME[mates[0]].slice(1) + ' is already there &mdash; same lane, same line. Stagger: a different height, or a different lane.' : '')); }
+  const p = PRINCIPLE[c.kind];
+  const r2 = document.createElement('div'); r2.className = 'row';
+  r2.innerHTML = '<span class="wy"><b>' + (p.es ? '<i>' + p.es + '</i> &middot; ' : '') + p.title + '.</b> ' + p.why + '</span>';
+  box.appendChild(r2);
+  /* the grid: 5 lanes x 4 sections; max 2 in a lane, max 3 on a line */
+  if (c.kind.startsWith('att')){ const g = gridCheck(c, c.ideal), nm = id => ROLE_NAME[id] || id;
+    const laneTxt = g.lane.length === 0 ? 'nobody else is in this lane'
+      : g.lane.length === 1 ? nm(g.lane[0].id) + ' is in it, ' + (g.lane[0].dz > 0 ? 'lower down' : 'higher up') + ' &mdash; 2 in a lane is the most'
+      : g.lane.map(x => nm(x.id)).join(' and ') + ' are in it too';
+    const lineTxt = g.line.length === 0 ? 'you are on your own line' : 'on your line: ' + g.line.map(nm).join(', ') + ' &mdash; ' + (g.line.length + 1) + ' with you' + (g.line.length + 1 === 3 ? ', the most' : g.line.length + 1 > 3 ? ' &mdash; one over the rule of thumb for a moment, because your full-back has joined the front line' : '');
+    let warn = '';
+    if (mine){ const t = gridCheck(c, mine);
+      if (t.lane.length >= 2 && t.lane.length > g.lane.length) warn = ' Your tap made it 3 in one lane &mdash; one too many.';
+      else if (t.line.length >= 3 && t.line.length > g.line.length) warn = ' Your tap made it ' + (t.line.length + 1) + ' on one line &mdash; one too many.'; }
+    const r3 = document.createElement('div'); r3.className = 'row';
+    r3.innerHTML = '<span class="wy"><b>The grid.</b> Five lanes, four sections; no more than 2 team-mates in a lane, no more than 3 on a line, so the man on the ball always has 2&ndash;3 options. At your spot: ' + laneTxt + '; ' + lineTxt + '.' + warn + '</span>';
+    box.appendChild(r3); }
+  else if (!c.turn){ const r3 = document.createElement('div'); r3.className = 'row';
+    r3.innerHTML = '<span class="wy"><b>The grid.</b> The 2-in-a-lane, 3-on-a-line rule of thumb is for when we have the ball &mdash; it keeps passing options open. Without it, we defend in lines: you are one of four across the midfield line.</span>';
+    box.appendChild(r3); }
+  { const r4 = document.createElement('div'); r4.className = 'row';
+    r4.innerHTML = '<span class="wy"><b>Find it on the pitch.</b> ' + (FIND[c.kind] || '') + '</span>';
+    box.appendChild(r4); }
+  const reveal = () => { drawMap(c, true, tap); document.getElementById('mapwrap').style.display = 'flex'; show(pFeed); setTimeout(prefetchNext, 400); };
+  const startW = [c.side*c.start[0], c.start[1]], rightW = [c.side*c.ideal[0], c.ideal[1]];
+  c.tl = { segs: [], total: 0 }; c.endAt = startW;
+  const addSeg = g => { c.tl.segs.push(g); c.tl.total += g.dur; };
+  const addRun = to => { const r = framePath(c, c.endAt, to); addSeg({ kind: 'run', dur: r.dur, tr: r.tr }); c.endAt = r.end; };
+  const go = (word, hint, after) => {
+    document.getElementById('mapwrap').style.display = 'none'; show(pAsk);
+    el('askWord').firstChild.textContent = word; el('askHint').textContent = hint; el('answers').innerHTML = '';
+    runSequence(() => { if (current === c) after(); }, c.tFreeze + c.tl.segs.slice(0, c.tl.done || 0).reduce((a, g) => a + g.dur, 0));
+  };
+  c.reveal = reveal; c.go = go; c.addRun = addRun; c.addSeg = addSeg; c.rightW = rightW;
+  if (tap) addRun(tap);
+  if (pts === 3){                                            // spot on: the play goes on
+    addSeg({ kind: 'pause', dur: 250 }); addSeg({ kind: 'play', dur: extendPlay(c) });
+    go('Go', 'Get to your spot. Eyes on the ball.', reveal);
+  } else if (pts === 1){                                     // close: then the last few metres to the centre of it
+    addSeg({ kind: 'pause', dur: 500 }); addRun(rightW); addSeg({ kind: 'pause', dur: 250 }); addSeg({ kind: 'play', dur: extendPlay(c) });
+    go('Go', 'Your spot, then the last few metres to the centre of the right one.', reveal);
+  } else {                                                   // wrong, or too slow: the answer first
+    fixPending = c;
+    const showFix = () => { c.tl.done = c.tl.segs.length; reveal();
+      el('next').textContent = 'Got it \u2014 show me the right spot'; el('replay').style.display = 'none'; };
+    if (tap) go('Go', 'Get to your spot. Eyes on the ball.', showFix); else showFix();
+  }
+}
+/* wrong: when he is ready, back to his eyes; with the play still frozen he runs to the right spot, then the play goes on */
+function runFix(){
+  const c = fixPending; fixPending = null;
+  if (!c || current !== c) return;
+  el('next').textContent = 'Next rep'; el('replay').style.display = '';
+  ringAt(c.rightW, 0xffd34d, 0.9);
+  c.addSeg({ kind: 'pause', dur: 350 }); c.addRun(c.rightW); c.addSeg({ kind: 'pause', dur: 300 }); c.addSeg({ kind: 'play', dur: extendPlay(c) });
+  c.go('The right spot', 'This is where you should have gone. Then the play goes on.', () => { c.tl.done = c.tl.segs.length; document.getElementById('mapwrap').style.display = 'flex'; show(pFeed); });
+}
+function answer(choice, btn){
+  clearTimeout(answerTimer);
+  timer.style.display = 'none';
+  const chosen = choice ? ranked.find(x => x.id === choice) : null;
+  const pts = chosen ? chosen.tier : 0;
+  const best = ranked[0];
+
+  [...el('answers').children].forEach(b => {
+    b.disabled = true;
+    if (btn && b === btn) b.classList.add(pts >= 2 ? 'right' : pts === 1 ? 'part' : 'wrong');
+  });
+
+  sPts += pts; sMax += 3;
+  const k = current.side === 1 ? 'R' : 'L';
+  stats[k].pts += pts; stats[k].max += 3;
+  if (pts === 3) sBest++;
+  paintSides(); saveStats();
+
+  setVeil(false);
+  setPhase(1, CFG.flashMs/1000);
+  drawPath3D(current);
+  aimReview(current);
+  renderer.render(scene, camera);
+  drawLabels();
+
+  const box = el('rank'); box.innerHTML = '';
+  if (!chosen){
+    const w = document.createElement('div');
+    w.className = 'row picked';
+    w.innerHTML = '<span class="chip t0">Too slow</span>' +
+      '<span class="wy">On the pitch that is a tackle. The look has to happen before it arrives.</span>';
+    box.appendChild(w);
+  }
+  ranked.forEach(x => {
+    const why = x.why[0] || (x.tier >= 2 ? 'fits the picture' : 'the picture does not support it here');
+    const r = document.createElement('div');
+    r.className = 'row' + (chosen && x.id === chosen.id ? ' picked' : '');
+    r.innerHTML = '<span class="chip t' + x.tier + '">' + TIER_NAME[x.tier] + '</span>' +
+      '<span class="wy"><b>' + x.label + '</b> — ' + why + '</span>' +
+      (chosen && x.id === chosen.id ? '<span class="you">You</span>' : '');
+    box.appendChild(r);
+  });
+  setTimeout(() => show(pFeed), 500);
+}
+
+function drawLabels(){
+  labels.innerHTML = ''; labels.style.display = 'block';
+  const svg = document.getElementById('leaders');
+  svg.style.display = 'block';
+  svg.innerHTML = '';
+  const w = stage.clientWidth, h = stage.clientHeight;
+  svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+
+  const v = new THREE.Vector3();
+  const toScreen = (mesh, y) => {
+    v.set(0, y, 0); mesh.localToWorld(v); v.project(camera);
+    return { x:(v.x*0.5+0.5)*w, y:(-v.y*0.5+0.5)*h, z:v.z };
+  };
+
+  /* Every figure on screen, labelled or not \u2014 a caption may not sit on any. */
+  const figures = [];
+  placed.forEach(p => {
+    const head = toScreen(p.mesh, 1.95), foot = toScreen(p.mesh, 0);
+    if (head.z > 1) return;
+    /* head down to about the knee \u2014 a caption may clip empty grass by his
+       boots, but never his body */
+    const tall = Math.abs(foot.y - head.y);
+    const halfW = Math.max(9, tall * 0.30);
+    figures.push({ x0:head.x-halfW, x1:head.x+halfW,
+                   y0:head.y-4, y1:head.y + tall*0.8 + 4 });
+  });
+
+  const items = [];
+  placed.forEach(p => {
+    if (!p.tag) return;
+    const a = toScreen(p.mesh, 2.0);
+    if (a.z > 1 || a.x < -60 || a.x > w + 60) return;
+    const d = document.createElement('div');
+    d.className = 'tag ' + (p.kind === 'own' ? 'kit' : 'opp');
+    d.textContent = p.tag;
+    d.style.visibility = 'hidden';
+    labels.appendChild(d);
+    items.push({ el:d, a, w:d.offsetWidth || 120, h:d.offsetHeight || 20,
+                 kit:(p.kind === 'own') });
+  });
+
+  /* Search outward from the player and take the FIRST clear spot, so the
+     leader stays short and the caption stays next to whoever it names. */
+  const M = 5, RMAX = 115, taken = [];
+  const prio = t => /keeper/.test(t) ? 2 : (/closing/.test(t) ? 1 : 0);
+  items.forEach(it => it.p = prio(it.el.textContent));
+  items.sort((x, y) => (x.p - y.p) || (x.a.y - y.a.y));
+  items.forEach(it => {
+    const hw = it.w/2, hh = it.h/2;
+    let best = null;
+    for (const pass of [0, 1]){ if (best) break;
+    const rmax = pass ? 260 : RMAX;
+    for (let r = 14; r <= rmax && !best; r += 5){
+      for (let k = 0; k < 24; k++){
+        // sweep out from straight above, alternating left and right
+        const ang = -Math.PI/2 + (k % 2 ? 1 : -1) * Math.ceil(k/2) * (Math.PI/12);
+        const cx = it.a.x + Math.cos(ang)*r, cy = it.a.y + Math.sin(ang)*r;
+        const rect = { x0:cx-hw, x1:cx+hw, y0:cy-hh, y1:cy+hh };
+        if (rect.x0 < M || rect.x1 > w-M || rect.y0 < M || rect.y1 > h-M) continue;
+        if (!pass && figures.some(f => !(rect.x1 < f.x0 || rect.x0 > f.x1 || rect.y1 < f.y0 || rect.y0 > f.y1))) continue;
+        if (taken.some(f => !(rect.x1 < f.x0-4 || rect.x0 > f.x1+4 || rect.y1 < f.y0-4 || rect.y0 > f.y1+4))) continue;
+        const cost = r + (Math.sin(ang) > 0 ? 16 : 0);   // prefer above the player
+        if (!best || cost < best.cost) best = { cx, cy, rect, cost };
+      }
+    }
+    }
+    if (!best){ if (it.el.remove) it.el.remove(); return; }
+
+    it.el.style.left = (best.cx - hw) + 'px';
+    it.el.style.top  = (best.cy - hh) + 'px';
+    it.el.style.visibility = 'visible';
+    taken.push(best.rect);
+
+    /* leader runs from the edge of the box, not its centre, so it is only as
+       long as the gap between them */
+    const dx = it.a.x - best.cx, dy = it.a.y - best.cy;
+    const t = Math.min(dx ? hw/Math.abs(dx) : 9, dy ? hh/Math.abs(dy) : 9);
+    const ex = best.cx + dx*t, ey = best.cy + dy*t;
+    const len = Math.hypot(it.a.x - ex, it.a.y - ey);
+    if (len > 3){
+      const NS = 'http://www.w3.org/2000/svg';
+      const ln = document.createElementNS(NS, 'line');
+      ln.setAttribute('x1', ex); ln.setAttribute('y1', ey);
+      ln.setAttribute('x2', it.a.x); ln.setAttribute('y2', it.a.y);
+      if (it.kit) ln.setAttribute('class', 'kit');
+      svg.appendChild(ln);
+      const dot = document.createElementNS(NS, 'circle');
+      dot.setAttribute('cx', it.a.x); dot.setAttribute('cy', it.a.y); dot.setAttribute('r', 2.4);
+      if (it.kit) dot.setAttribute('class', 'kit');
+      svg.appendChild(dot);
+    }
+  });
+}
+
+function endSession(){
+  setVeil(true, 'Session done', 'Check the two bars. The lower one is where the work is.');
+  labels.style.display = 'none'; el('leaders').style.display = 'none';
+  el('hmeta').textContent = 'Session done';
+  el('sumScore').textContent = (sMax ? Math.round(100*sPts/sMax) : 0)+'%';
+  el('sumFlash').textContent = sBest + '/' + CFG.repsPerSession;
+  const l = stats.L.max ? stats.L.pts/stats.L.max : null;
+  const r = stats.R.max ? stats.R.pts/stats.R.max : null;
+  if (l === null || r === null || stats.L.max < 8 || stats.R.max < 8){
+    el('sumGap').textContent = '—';
+    el('sumNote').textContent = 'A few more sessions and the left-right split becomes worth reading.';
+  } else {
+    const gap = Math.round(Math.abs(l-r)*100);
+    el('sumGap').textContent = gap+' pts';
+    el('sumNote').textContent = gap < 8
+      ? 'Both sides read about the same. Keep it going at training: every time the ball moves, move with it.'
+      : 'He is '+gap+' points weaker on the '+(l<r?'left':'right')+' wing. The scenes are mirror images, so this is a looking habit, not a foot. Worth extra reps on that side at training.';
+  }
+  show(pSum);
+}
+
+function paintSeg(){
+  [...el('seg').children].forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.side === stats.side)));
+  [...el('modeSeg').children].forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.mode === modeNow())));
+}
+const modeNow = () => stats.mode === 'test' ? 'test' : 'learn';
+const learning = () => modeNow() === 'learn';
+el('modeSeg').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  stats.mode = b.dataset.mode; paintSeg(); saveStats();
+};
+el('seg').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  stats.side = b.dataset.side; paintSeg(); saveStats();
+};
+
+el('start').onclick = startSession;
+el('again').onclick = startSession;
+el('next').onclick  = nextRep;
+el('replay').onclick = replayLook;
+el('done').onclick  = () => { show(pIdle); paintSeg(); el('hmeta').textContent = 'Rep 0 / '+CFG.repsPerSession;
+  setVeil(true,'Ready','Five lanes. No more than two in a lane, three on a line.'); };
+el('reset').onclick = () => {
+  stats = { L:{pts:0,max:0}, R:{pts:0,max:0}, side: stats.side };
+  paintSides(); paintSeg(); saveStats(); show(pIdle);
+  el('hmeta').textContent = 'Rep 0 / '+CFG.repsPerSession;
+  setVeil(true,'Ready','History cleared. Both sides start level.');
+};
+
+el('hmeta').textContent = 'Rep 0 / ' + CFG.repsPerSession;
+resize();
+loop();
+try {
+  const seed = makeScene(1, 'attFar'); current = seed; buildScene(seed); seqFrame(seed, seed.tFreeze); current = null;
+} catch (e) { console.error('seed scene failed', e); }
+loadStats();
+</script>
